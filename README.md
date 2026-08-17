@@ -8,6 +8,142 @@
 
 This repository accompanies our research paper titled "[Generative Agents: Interactive Simulacra of Human Behavior](https://arxiv.org/abs/2304.03442)." It contains our core simulation module for  generative agents—computational agents that simulate believable human behaviors—and their game environment. Below, we document the steps for setting up the simulation environment on your local machine and for replaying the simulation as a demo animation.
 
+---
+
+# 新版功能說明（中文）
+
+這個 fork 將原始的 Stanford 程式碼全面現代化，讓它在今天可以直接跑起來，並加上省錢提速與新功能。以下是完整說明。
+
+## 新功能總覽
+
+| 功能 | 說明 |
+|---|---|
+| 新版 OpenAI SDK | 全面遷移到 `openai>=1.0`；已下架的 `text-davinci-003` 等模型自動改由現行模型服務（預設 `gpt-4o-mini`，可自訂） |
+| 多供應商支援 | 內建 OpenAI (ChatGPT)、DeepSeek、MiniMax、Gemini、Ollama（本地模型）預設，也支援任何 OpenAI 相容端點 |
+| 網頁設定 API Key | 瀏覽器開 `/settings/` 頁面即可選供應商、輸入 key、選模型，不用改任何程式碼 |
+| LLM 回應快取 | 相同的 prompt 直接從本機 sqlite 快取回應，大幅節省 API 費用；重跑實驗幾乎免費 |
+| 平行化模擬 | 每一步所有 agent 的思考併發執行（原版是逐一排隊），多人模擬速度大幅提升 |
+| 自動存檔 | 每 50 步自動存檔 + 崩潰時緊急存檔，API 逾時不再毀掉整場模擬 |
+| 費用統計 | 隨時輸入 `stats` 查看各模型 token 用量與預估花費 |
+| 玩家介入 | `whisper` 植入想法、`interview` 與 agent 對話，主動影響劇情走向 |
+| VPS 部署 | 支援公網部署，`ALLOWED_HOSTS`、設定頁 token 保護等都已備妥 |
+
+## 快速開始
+
+```bash
+# 1. 安裝依賴（需要 Python 3.11+）
+python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+
+# 2. 啟動環境伺服器（第一個終端機）
+cd environment/frontend_server
+python manage.py runserver
+
+# 3. 啟動模擬伺服器（第二個終端機）
+cd reverie/backend_server
+python reverie.py
+```
+
+啟動 `reverie.py` 之前，要先設定好 API key（見下一節）。之後照原版流程：輸入 fork 來源 `base_the_ville_isabella_maria_klaus`、取一個新模擬名稱，瀏覽器開 [http://localhost:8000/simulator_home](http://localhost:8000/simulator_home)，在 `Enter option:` 輸入 `run 100` 開跑。
+
+## 設定 API Key（兩種方式）
+
+### 方式一：網頁設定頁（推薦）
+環境伺服器啟動後，瀏覽器開 [http://localhost:8000/settings/](http://localhost:8000/settings/)：
+
+1. 從下拉選單選擇供應商——**OpenAI (ChatGPT)、DeepSeek、MiniMax、Gemini、Ollama、自訂**——端點網址和預設模型會自動填入
+2. 貼上你的 API key
+3. 按「Save」存檔，然後（重）啟動 `reverie.py` 生效
+
+設定會存到專案根目錄的 `llm_config.json`（檔案權限 600、已加入 `.gitignore`、頁面永遠不會回顯完整 key）。此檔案的設定**優先於環境變數**。
+
+**Embedding 注意事項**：DeepSeek 和 MiniMax 沒有 OpenAI 相容的 embedding API，所以選這兩家時，設定頁的 Embedding 區塊預設指向 OpenAI——你需要在該區塊另外填一組 OpenAI（或 Gemini / Ollama）的 key。Ollama 和 Gemini 則聊天與 embedding 都可以用同一家。
+
+### 方式二：環境變數（或 `.env` 檔）
+在 `reverie/backend_server` 目錄建立 `.env` 檔（或直接 export）：
+
+```
+OPENAI_API_KEY=你的key
+OPENAI_BASE_URL=            # 留空 = OpenAI 官方；DeepSeek 填 https://api.deepseek.com
+OPENAI_CHAT_MODEL=gpt-4o-mini
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+EMBEDDING_API_KEY=          # embedding 用不同供應商時才需要
+EMBEDDING_BASE_URL=
+```
+
+## 效能相關環境變數
+
+| 變數 | 預設 | 說明 |
+|---|---|---|
+| `LLM_CACHE` | `1` | 設 `0` 關閉 LLM 回應快取 |
+| `LLM_CACHE_PATH` | 自動 | 快取 sqlite 檔案位置 |
+| `PARALLEL_PERSONAS` | `1` | 設 `0` 改回逐一執行 agent |
+| `MAX_PARALLEL_WORKERS` | `8` | 平行執行的執行緒數 |
+| `CHECKPOINT_FREQ` | `50` | 每 N 步自動存檔，設 `0` 關閉 |
+| `REVERIE_DEBUG` | `0` | 設 `1` 顯示完整 prompt 除錯輸出 |
+
+## 模擬指令一覽
+
+在模擬伺服器的 `Enter option:` 提示符輸入：
+
+| 指令 | 功能 |
+|---|---|
+| `run <步數>` | 跑指定步數（1 步 = 遊戲內 10 秒） |
+| `save` | 存檔（不退出） |
+| `fin` | 存檔並退出 |
+| `exit` | 不存檔退出（會刪除本場模擬） |
+| `stats` | 顯示各模型 token 用量與預估費用 |
+| `whisper <角色名>: <想法>` | **玩家介入**：把一個想法植入 agent 的記憶流，會影響它之後的計畫與對話。例：`whisper Isabella Rodriguez: I am planning a party tonight`（需先跑至少 1 步） |
+| `interview <角色名>` | 與 agent 即時對話（無痕，不寫入記憶）。例：`interview Klaus Mueller` |
+| `help` | 完整指令列表 |
+
+**玩家介入玩法提示**：論文中著名的「情人節派對」湧現劇情，就是用 whisper 機制植入一條記憶引發的——你可以 whisper 給某個 agent「今晚要辦派對」，然後觀察消息如何在小鎮傳開、誰會赴約。
+
+費用統計除了 `stats` 指令外，每次存檔也會寫入該模擬資料夾的 `reverie/llm_stats.json`。
+
+## 部署到 VPS
+
+2GB RAM 的小 VPS 就足夠（重運算都發生在 LLM 供應商端）：
+
+```bash
+git clone <你的fork網址> && cd generative_agents
+python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+
+# 環境伺服器（8000 埠）
+cd environment/frontend_server
+ALLOWED_HOSTS=<你的網域或IP> SETTINGS_TOKEN=<自訂密碼> \
+  gunicorn frontend_server.wsgi -b 0.0.0.0:8000 --timeout 600
+
+# 模擬伺服器（互動式 CLI，放在 tmux 裡跑）
+cd reverie/backend_server
+tmux new -s reverie
+python reverie.py
+```
+
+部署後：
+1. 開 `http://<你的VPS>:8000/settings/?token=<自訂密碼>` 輸入 API key
+2. 開 `http://<你的VPS>:8000/simulator_home` 觀看模擬——**跑模擬時要保持這個分頁開啟**（畫面步進由瀏覽器驅動）
+3. 回放：`http://<你的VPS>:8000/replay/<模擬名稱>/<起始步數>/`
+
+**安全提醒（重要）**：本系統沒有登入驗證，放上公網請務必——
+
+* 用防火牆把 8000 埠限制在你自己的 IP，或在前面架 nginx + basic auth
+* 一定要設 `SETTINGS_TOKEN`（保護 API key 設定頁）和真實的 `ALLOWED_HOSTS`
+* `llm_config.json` 內含你的 API key，注意檔案權限（系統會自動設為 600）
+
+## 執行測試（不需要 API key）
+
+```bash
+# 後端（15 個測試）
+cd reverie/backend_server && python -m unittest discover tests
+
+# 前端（5 個測試）
+cd environment/frontend_server && python manage.py test translator
+```
+
+---
+
 ## What's New in This Fork
 This fork modernizes the original codebase so it runs today:
 

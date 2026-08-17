@@ -5,3 +5,7 @@ env
 *.pyc
 llm_config.json
 reverie/backend_server/llm_cache.sqlite
+environment/frontend_server/storage
+environment/frontend_server/compressed_storage
+environment/frontend_server/temp_storage
+environment/frontend_server/static_dirs

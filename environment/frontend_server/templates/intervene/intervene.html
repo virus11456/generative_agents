@@ -1,10 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-Hant">
 <head>
   <meta charset="UTF-8">
-  <title>Intervene in the Simulation</title>
+  <title>介入模擬</title>
   <style>
-    body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    body { font-family: -apple-system, "Segoe UI", "Noto Sans TC", Roboto,
+           sans-serif;
            background: #f4f4f6; margin: 0; padding: 2rem; color: #222; }
     .card { max-width: 640px; margin: 0 auto; background: #fff;
             border-radius: 10px; padding: 2rem;
@@ -32,12 +33,11 @@
 </head>
 <body>
 <div class="card">
-  <h1>Intervene: Whisper to an Agent</h1>
+  <h1>💬 介入：對居民耳語</h1>
 
   {% if queued %}
-  <div class="ok">Whisper queued. The simulation backend will inject it
-    before its next step (it must be running -- use <code>run</code> at the
-    simulation prompt).</div>
+  <div class="ok">耳語已排入佇列。模擬後端會在下一步之前注入
+    （後端必須正在運行——在模擬指令列輸入 <code>run</code>）。</div>
   {% endif %}
   {% if error %}
   <div class="err">{{ error }}</div>
@@ -46,34 +46,32 @@
   <form method="post">{% csrf_token %}
     <input type="hidden" name="token" value="{{ token }}">
 
-    <label for="persona">Agent</label>
+    <label for="persona">居民</label>
     {% if persona_names %}
     <select id="persona" name="persona">
       {% for name in persona_names %}
       <option value="{{ name }}">{{ name }}</option>
       {% endfor %}
     </select>
-    <div class="hint">Current simulation: {{ sim_code }}</div>
+    <div class="hint">目前模擬：{{ sim_code }}</div>
     {% else %}
     <input id="persona" name="persona"
-           placeholder="e.g. Isabella Rodriguez">
-    <div class="hint">No running simulation detected -- type the agent's
-      exact name.</div>
+           placeholder="例如：Isabella Rodriguez">
+    <div class="hint">未偵測到運行中的模擬——請輸入居民的完整英文名字。</div>
     {% endif %}
 
-    <label for="whisper">Whisper (a thought planted in the agent's mind)</label>
+    <label for="whisper">耳語（種進居民腦中的念頭）</label>
     <textarea id="whisper" name="whisper"
-      placeholder="e.g. You are planning a Valentine's Day party at Hobbs Cafe tonight at 5pm, and you want to invite everyone you meet"></textarea>
-    <div class="hint">Write it addressed to the agent as "you". The thought
-      is permanent: it will shape the agent's plans and conversations.</div>
+      placeholder="例如：You are planning a Valentine's Day party at Hobbs Cafe tonight at 5pm, and you want to invite everyone you meet（建議用英文，居民的記憶是英文的）"></textarea>
+    <div class="hint">請以「你（you）」稱呼該居民來撰寫。這個念頭是永久的：
+      會影響居民之後的計畫與對話。</div>
 
-    <button type="submit">Whisper</button>
+    <button type="submit">送出耳語</button>
   </form>
 
-  <div class="warn">The whisper is applied between simulation steps, so the
-    simulation must have run at least one step and be actively running
-    (<code>run &lt;count&gt;</code>). Whispers queued for agents that have
-    not started yet are held until they do.</div>
+  <div class="warn">耳語會在模擬步驟之間套用，因此模擬必須至少跑過一步、
+    且正在運行（<code>run &lt;步數&gt;</code>）。對尚未啟動的居民排入的
+    耳語會保留到他啟動為止。</div>
 </div>
 </body>
 </html>

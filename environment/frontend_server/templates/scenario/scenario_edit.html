@@ -1,10 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-Hant">
 <head>
   <meta charset="UTF-8">
-  <title>Edit Scenario: {{ sim_code }}</title>
+  <title>編輯劇本：{{ sim_code }}</title>
   <style>
-    body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    body { font-family: -apple-system, "Segoe UI", "Noto Sans TC", Roboto,
+           sans-serif;
            background: #f4f4f6; margin: 0; padding: 2rem; color: #222; }
     .card { max-width: 760px; margin: 0 auto 1.5rem; background: #fff;
             border-radius: 10px; padding: 2rem;
@@ -34,12 +35,12 @@
 </head>
 <body>
 <div class="card">
-  <h1>Edit Scenario: {{ sim_code }}</h1>
-  <p class="hint"><a href="/scenario/{% if token %}?token={{ token }}{% endif %}">&larr; back to scenario list</a></p>
+  <h1>🎭 編輯劇本：{{ sim_code }}</h1>
+  <p class="hint"><a href="/scenario/{% if token %}?token={{ token }}{% endif %}">&larr; 回到劇本列表</a></p>
 
   {% if saved %}
-  <div class="ok">Saved. Identity fields are written into the simulation;
-    whispers are saved to <code>{{ csv_name }}</code>.</div>
+  <div class="ok">已儲存。身分欄位已寫入模擬；耳語已存到
+    <code>{{ csv_name }}</code>。</div>
   {% endif %}
 
   <form method="post">{% csrf_token %}
@@ -52,20 +53,20 @@
     <textarea id="{{ p.name }}__{{ field }}" name="{{ p.name }}__{{ field }}"
               rows="{% if field == 'innate' or field == 'lifestyle' %}1{% else %}3{% endif %}">{{ value }}</textarea>
     {% endfor %}
-    <label for="{{ p.name }}__whispers">whispers (one per line, addressed
-      to the character as "you")</label>
+    <label for="{{ p.name }}__whispers">耳語（一行一則，以「你（you）」
+      稱呼該角色）</label>
     <textarea id="{{ p.name }}__whispers" name="{{ p.name }}__whispers"
               rows="4">{{ p.whispers }}</textarea>
     {% endfor %}
 
-    <button type="submit">Save all changes</button>
+    <button type="submit">儲存全部變更</button>
   </form>
 
-  <div class="next"><strong>To run this scenario:</strong> start
-    <code>reverie.py</code>, fork from <code>{{ sim_code }}</code>, then at
-    the prompt run <code>run 1</code> followed by
-    <code>call -- load history the_ville/{{ csv_name }}</code> to load the
-    whispers, then <code>run</code> as many steps as you like.</div>
+  <div class="next"><strong>要運行這個劇本：</strong>啟動
+    <code>reverie.py</code>，從 <code>{{ sim_code }}</code> fork，
+    在指令列先跑 <code>run 1</code>，再輸入
+    <code>call -- load history the_ville/{{ csv_name }}</code>
+    載入耳語，之後想跑多少步就 <code>run</code> 多少步。</div>
 </div>
 </body>
 </html>

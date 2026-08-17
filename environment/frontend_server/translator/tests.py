@@ -27,7 +27,7 @@ class LLMSettingsPageTests(SimpleTestCase):
   def test_get_renders_form(self):
     response = self.client.get("/settings/")
     self.assertEqual(response.status_code, 200)
-    self.assertContains(response, "LLM Provider Settings")
+    self.assertContains(response, "LLM 供應商設定")
 
   def test_post_saves_config(self):
     response = self.client.post("/settings/", {
@@ -138,12 +138,12 @@ class ScenarioEditorTests(SimpleTestCase):
   def test_generate_rejects_bad_name(self):
     response = self.client.post("/scenario/", {
       "fork": self.SIM, "name": "bad name!", "story": "a story"})
-    self.assertContains(response, "letters, digits")
+    self.assertContains(response, "只能使用英文字母")
 
   def test_generate_rejects_duplicate_name(self):
     response = self.client.post("/scenario/", {
       "fork": self.SIM, "name": self.SIM, "story": "a story"})
-    self.assertContains(response, "already exists")
+    self.assertContains(response, "的模擬了")
 
   def test_edit_get_shows_fields(self):
     response = self.client.get(f"/scenario/{self.SIM}/")
@@ -200,7 +200,7 @@ class EventsPageTests(SimpleTestCase):
   def test_get_renders(self):
     response = self.client.get("/events/")
     self.assertEqual(response.status_code, 200)
-    self.assertContains(response, "World Events")
+    self.assertContains(response, "世界事件")
 
   def test_token_protection(self):
     os.environ["SETTINGS_TOKEN"] = "s3cret"
@@ -222,7 +222,7 @@ class EventsPageTests(SimpleTestCase):
     response = self.client.post("/events/", {
       "action": "add", "type": "broadcast", "text": "",
       "target": "all", "days_from_now": "0", "every_days": "0"})
-    self.assertContains(response, "need a whisper text")
+    self.assertContains(response, "必須填寫耳語內容")
     self.assertEqual(self._queued(), [])
 
   def test_add_broadcast_with_named_targets(self):
@@ -341,7 +341,7 @@ class IntervenePageTests(SimpleTestCase):
   def test_get_renders_form(self):
     response = self.client.get("/intervene/")
     self.assertEqual(response.status_code, 200)
-    self.assertContains(response, "Whisper")
+    self.assertContains(response, "耳語")
 
   def test_post_queues_whisper_as_own_file(self):
     response = self.client.post("/intervene/", {
@@ -362,7 +362,7 @@ class IntervenePageTests(SimpleTestCase):
 
   def test_post_rejects_empty_fields(self):
     response = self.client.post("/intervene/", {"persona": "", "whisper": ""})
-    self.assertContains(response, "required")
+    self.assertContains(response, "都必須填寫")
     self.assertEqual(self._queued(), [])
 
   def test_token_protection(self):

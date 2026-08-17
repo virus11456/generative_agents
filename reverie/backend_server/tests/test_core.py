@@ -157,6 +157,21 @@ class TestConfigFilePriority(unittest.TestCase):
     utils = self._reload_utils()
     self.assertEqual(utils.embedding_api_key, "sk-chat-key")
 
+  def test_time_flow_knobs(self):
+    cfg_path = os.path.join(_TMP, "llm_config3.json")
+    with open(cfg_path, "w") as f:
+      f.write('{"sec_per_step": "60", "real_minutes_per_day": "15"}')
+    os.environ["LLM_CONFIG_PATH"] = cfg_path
+    utils = self._reload_utils()
+    self.assertEqual(utils.sec_per_step_override, 60)
+    self.assertEqual(utils.real_minutes_per_day, 15.0)
+
+  def test_time_flow_defaults_off(self):
+    os.environ["LLM_CONFIG_PATH"] = os.path.join(_TMP, "missing.json")
+    utils = self._reload_utils()
+    self.assertEqual(utils.sec_per_step_override, 0)
+    self.assertEqual(utils.real_minutes_per_day, 0.0)
+
   def test_performance_knobs_from_file(self):
     cfg_path = os.path.join(_TMP, "llm_config3.json")
     with open(cfg_path, "w") as f:

@@ -154,3 +154,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 # collectstatic step.
 WHITENOISE_USE_FINDERS = True
 WHITENOISE_AUTOREFRESH = True
+
+# Allow the dashboard drawer on simulator_home to embed the
+# admin pages in same-origin iframes.
+X_FRAME_OPTIONS = 'SAMEORIGIN'

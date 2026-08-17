@@ -4,3 +4,4 @@ gunicorn>=21.2
 numpy>=1.24
 openai>=1.40
 python-dotenv>=1.0
+whitenoise>=6.6

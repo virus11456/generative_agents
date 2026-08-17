@@ -44,6 +44,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -147,3 +148,9 @@ MEDIA_ROOT = os.path.join(os.path.dirname(BASE_DIR), "media_root")
 
 
 DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
+
+# gunicorn does not serve static files; WhiteNoise does, and
+# USE_FINDERS serves straight from STATICFILES_DIRS without a
+# collectstatic step.
+WHITENOISE_USE_FINDERS = True
+WHITENOISE_AUTOREFRESH = True

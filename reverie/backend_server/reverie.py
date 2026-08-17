@@ -87,12 +87,18 @@ class ReverieServer:
     self.fork_sim_code = fork_sim_code
     fork_folder = f"{fs_storage}/{self.fork_sim_code}"
 
-    # <sim_code> indicates our current simulation. The first step here is to 
-    # copy everything that's in <fork_sim_code>, but edit its 
-    # reverie/meta/json's fork variable. 
+    # <sim_code> indicates our current simulation. The first step here is to
+    # copy everything that's in <fork_sim_code>, but edit its
+    # reverie/meta/json's fork variable.
     self.sim_code = sim_code
     sim_folder = f"{fs_storage}/{self.sim_code}"
     copyanything(fork_folder, sim_folder)
+
+    # git cannot track empty directories, so a freshly-cloned base sim has
+    # no movement/ folder -- create it (and environment/) so the first
+    # step's writes cannot die on a missing path.
+    os.makedirs(f"{sim_folder}/movement", exist_ok=True)
+    os.makedirs(f"{sim_folder}/environment", exist_ok=True)
 
     with open(f"{sim_folder}/reverie/meta.json") as json_file:  
       reverie_meta = json.load(json_file)

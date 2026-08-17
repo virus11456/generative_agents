@@ -37,6 +37,7 @@ This repository accompanies our research paper titled "[Generative Agents: Inter
 | 經濟系統 | 每人有錢包，每日領薪、去店家消費自動扣款、對話中的交易由 LLM 依雙方詞條判定（慷慨的請客、吝嗇的分帳）、缺錢會焦慮，`/economy/` 頁面看排行與流水帳 |
 | 小鎮日報 | 每個遊戲日結束自動把當天所有行動與對話寫成一份**中文報紙**，`/chronicle/` 頁面閱讀——離開幾天回來，從日報補劇情 |
 | 一頁式儀表板 | `simulator_home` 頂部就是控制列：設定、事件/選舉、經濟/關係、劇本、日報、介入六個面板以側欄開啟，邊看地圖邊調整；token 輸入一次自動記住 |
+| 時間流速控制 | 設定頁可調「每步遊戲秒數」與「每遊戲日真實分鐘」——例如 60 秒/步 + 15 分鐘/日，就是每 15 真實分鐘過一個遊戲日，同時大幅減少 LLM 呼叫 |
 | 全中文介面 + RWD | 所有管理頁面與主畫面都是繁體中文；主頁重新排版——地圖滿版縮放、居民卡片網格，手機、iPad、桌機都能看 |
 
 ## 快速開始
@@ -343,6 +344,7 @@ This fork modernizes the original codebase so it runs today:
 * **Economy** — wallets with daily wages, deterministic venue spending (consumption verbs at known venues; working is free), LLM-adjudicated conversation trades fed both parties' traits and balances, and a poverty loop that plants money-anxiety whispers below a threshold. Browse balances (with traits), the relationship web, and the full ledger at `/economy/`; the daily chronicle gains an economy section.
 * **Cost ceiling** — set `COST_LIMIT_USD` to auto-save and halt the simulation when the estimated spend reaches your budget (warning at 80%).
 * **Docker deployment** — `docker compose up -d` for the web server and `docker compose run --rm backend` for the interactive simulation; state persists via bind mounts.
+* **Time-flow control** — `sec_per_step` overrides how many game-seconds each step advances (fewer steps per day = fewer LLM calls), and `real_minutes_per_day` paces stepping so one game day takes at least that many real minutes (e.g. 60 + 15 ≈ a 15-minute game day); both on the `/settings` page.
 * **One-page dashboard** — `simulator_home` now carries a fixed control bar: Settings, Events/Elections, Economy/Relationships, Scenario, Chronicle, and Intervene all open in a side drawer over the live map, with the admin token remembered in the browser.
 * **Traditional Chinese UI + responsive layout** — every admin page and the main map page are localized to Traditional Chinese; the home page is redesigned with a full-width scaling map and a resident card grid that works on phones, tablets, and desktops.
 

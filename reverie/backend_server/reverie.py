@@ -50,6 +50,8 @@ MAX_PARALLEL_WORKERS = globals().get("max_parallel_workers", 8)
 CHECKPOINT_FREQ = globals().get("checkpoint_freq", 50)
 COST_LIMIT_USD = globals().get("cost_limit_usd", 0)
 HEADLESS_MODE = globals().get("headless_mode", False)
+SEC_PER_STEP_OVERRIDE = globals().get("sec_per_step_override", 0)
+REAL_MINUTES_PER_DAY = globals().get("real_minutes_per_day", 0.0)
 CHRONICLE_ENABLED = globals().get("chronicle_enabled", True)
 CHRONICLE_LANG = globals().get("chronicle_lang",
                                "Traditional Chinese (繁體中文)")
@@ -122,9 +124,19 @@ class ReverieServer:
     # progresses (that is, everytime curr_env_file is recieved). 
     self.curr_time = datetime.datetime.strptime(reverie_meta['curr_time'], 
                                                 "%B %d, %Y, %H:%M:%S")
-    # <sec_per_step> denotes the number of seconds in game time that each 
-    # step moves foward. 
+    # <sec_per_step> denotes the number of seconds in game time that each
+    # step moves foward.
     self.sec_per_step = reverie_meta['sec_per_step']
+    if SEC_PER_STEP_OVERRIDE:
+      self.sec_per_step = SEC_PER_STEP_OVERRIDE
+    # Pacing floor: with real_minutes_per_day set, each step must take at
+    # least this many real seconds so a game day lasts about that long.
+    # (Steps that need heavy LLM work can still take longer.)
+    self.min_real_sec_per_step = 0.0
+    if REAL_MINUTES_PER_DAY and self.sec_per_step:
+      steps_per_day = 86400 / self.sec_per_step
+      self.min_real_sec_per_step = (REAL_MINUTES_PER_DAY * 60
+                                    / steps_per_day)
     
     # <maze> is the main Maze instance. Note that we pass in the maze_name
     # (e.g., "double_studio") to instantiate Maze. 
@@ -465,6 +477,8 @@ class ReverieServer:
           pass
       
         if env_retrieved:
+          step_started_at = time.time()
+
           # Apply any whispers queued from the frontend's /intervene page.
           self._apply_pending_interventions()
 
@@ -630,9 +644,18 @@ class ReverieServer:
               print (f"COST WARNING: est. ${spent} is over 80% of the "
                      f"${COST_LIMIT_USD} limit.")
 
+          # Pacing floor (real_minutes_per_day): if this step finished
+          # faster than the per-step budget, sleep off the difference so a
+          # game day lasts about the configured real time.
+          if self.min_real_sec_per_step:
+            remaining = (self.min_real_sec_per_step
+                         - (time.time() - step_started_at))
+            if remaining > 0:
+              time.sleep(remaining)
+
           int_counter -= 1
-          
-      # Sleep so we don't burn our machines. 
+
+      # Sleep so we don't burn our machines.
       time.sleep(self.server_sleep)
 
 

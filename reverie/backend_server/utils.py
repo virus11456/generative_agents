@@ -118,6 +118,15 @@ econ_starting_balance = _cfg_num("econ_starting_balance",
                                  "ECONOMY_STARTING_BALANCE", 100.0)
 econ_daily_wage = _cfg_num("econ_daily_wage", "ECONOMY_DAILY_WAGE", 80.0)
 
+# Time flow: <sec_per_step> overrides how many game-seconds each step
+# advances (0 = keep the simulation's own value, originally 10).
+# <real_minutes_per_day> paces stepping so one game day takes at least this
+# many real minutes (0 = run as fast as the LLM allows). E.g. sec_per_step=60
+# with real_minutes_per_day=15 gives a 15-minute game day.
+sec_per_step_override = _cfg_num("sec_per_step", "SEC_PER_STEP", 0, int)
+real_minutes_per_day = _cfg_num("real_minutes_per_day",
+                                "REAL_MINUTES_PER_DAY", 0.0)
+
 # Headless mode: the backend advances the world without a browser tab by
 # writing the environment files itself. Open simulator_home anytime to watch.
 headless_mode = _cfg_bool("headless", "HEADLESS", False)

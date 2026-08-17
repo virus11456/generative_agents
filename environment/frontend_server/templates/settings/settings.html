@@ -126,6 +126,21 @@
         <option value="1" {% if cfg.headless == "1" %}selected{% endif %}>開啟——世界自己運轉</option>
       </select>
 
+      <label for="sec_per_step">每步遊戲秒數（時間流速）</label>
+      <input id="sec_per_step" name="sec_per_step" type="number" min="0"
+             step="1" value="{{ cfg.sec_per_step }}"
+             placeholder="0＝沿用模擬原設定（原版 10）">
+      <div class="hint">每個模擬步驟推進的遊戲秒數。調大＝時間流速變快、
+        每天的 LLM 呼叫變少（更省錢）；60 是常用值。</div>
+
+      <label for="real_minutes_per_day">每遊戲日至少花費（真實分鐘）</label>
+      <input id="real_minutes_per_day" name="real_minutes_per_day"
+             type="number" min="0" step="1"
+             value="{{ cfg.real_minutes_per_day }}"
+             placeholder="0＝不限速，全速運轉">
+      <div class="hint">節奏下限：例如填 15 並把上面設成 60，一個遊戲日
+        大約就是 15 真實分鐘（LLM 忙碌時可能稍慢，不會更快）。</div>
+
       <label for="chronicle">小鎮日報（每遊戲日自動出刊）</label>
       <select id="chronicle" name="chronicle">
         <option value="1" {% if cfg.chronicle != "0" %}selected{% endif %}>開啟（每遊戲日一次 LLM 呼叫）</option>

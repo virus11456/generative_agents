@@ -39,7 +39,6 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'translator',
     'corsheaders',
-    'storages',
 ]
 
 MIDDLEWARE = [
@@ -143,3 +142,5 @@ MEDIA_ROOT = os.path.join(os.path.dirname(BASE_DIR), "media_root")
 
 
 
+
+DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'

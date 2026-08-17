@@ -18,6 +18,7 @@ term "personas" to refer to generative agents, "associative memory" to refer
 to the memory stream, and "reverie" to refer to the overarching simulation 
 framework.
 """
+import concurrent.futures
 import json
 import numpy
 import datetime
@@ -28,12 +29,18 @@ import os
 import shutil
 import traceback
 
-from selenium import webdriver
-
 from global_methods import *
 from utils import *
 from maze import *
 from persona.persona import *
+from persona.prompt_template.gpt_structure import (format_llm_stats,
+                                                   save_llm_stats)
+
+# Performance/robustness knobs (overridable in utils.py; the globals().get
+# fallbacks keep older hand-written utils.py files working).
+PARALLEL_PERSONAS = globals().get("parallel_personas", True)
+MAX_PARALLEL_WORKERS = globals().get("max_parallel_workers", 8)
+CHECKPOINT_FREQ = globals().get("checkpoint_freq", 50)
 
 ##############################################################################
 #                                  REVERIE                                   #
@@ -182,9 +189,15 @@ class ReverieServer:
       outfile.write(json.dumps(reverie_meta, indent=2))
 
     # Save the personas.
-    for persona_name, persona in self.personas.items(): 
+    for persona_name, persona in self.personas.items():
       save_folder = f"{sim_folder}/personas/{persona_name}/bootstrap_memory"
       persona.save(save_folder)
+
+    # Save LLM usage/cost statistics alongside the simulation.
+    try:
+      save_llm_stats(f"{sim_folder}/reverie/llm_stats.json")
+    except Exception:
+      pass
 
 
   def start_path_tester_server(self): 
@@ -368,17 +381,33 @@ class ReverieServer:
           # move. The movement for each of the personas comes in the form of
           # x y coordinates where the persona will move towards. e.g., (50, 34)
           # This is where the core brains of the personas are invoked. 
-          movements = {"persona": dict(), 
+          movements = {"persona": dict(),
                        "meta": dict()}
-          for persona_name, persona in self.personas.items(): 
-            # <next_tile> is a x,y coordinate. e.g., (58, 9)
-            # <pronunciatio> is an emoji. e.g., "\ud83d\udca4"
-            # <description> is a string description of the movement. e.g., 
-            #   writing her next novel (editing her novel) 
-            #   @ double studio:double studio:common room:sofa
-            next_tile, pronunciatio, description = persona.move(
-              self.maze, self.personas, self.personas_tile[persona_name], 
+
+          # <next_tile> is a x,y coordinate. e.g., (58, 9)
+          # <pronunciatio> is an emoji. e.g., "\ud83d\udca4"
+          # <description> is a string description of the movement. e.g.,
+          #   writing her next novel (editing her novel)
+          #   @ double studio:double studio:common room:sofa
+          def _move_persona(persona_name):
+            persona = self.personas[persona_name]
+            return persona_name, persona.move(
+              self.maze, self.personas, self.personas_tile[persona_name],
               self.curr_time)
+
+          persona_names = list(self.personas.keys())
+          if PARALLEL_PERSONAS and len(persona_names) > 1:
+            # Persona steps run concurrently; cross-persona interactions
+            # (conversations) are serialized by a lock inside plan.py.
+            workers = min(MAX_PARALLEL_WORKERS, len(persona_names))
+            with concurrent.futures.ThreadPoolExecutor(workers) as pool:
+              move_results = list(pool.map(_move_persona, persona_names))
+          else:
+            move_results = [_move_persona(name) for name in persona_names]
+
+          for persona_name, (next_tile, pronunciatio,
+                             description) in move_results:
+            persona = self.personas[persona_name]
             movements["persona"][persona_name] = {}
             movements["persona"][persona_name]["movement"] = next_tile
             movements["persona"][persona_name]["pronunciatio"] = pronunciatio
@@ -401,10 +430,15 @@ class ReverieServer:
           with open(curr_move_file, "w") as outfile: 
             outfile.write(json.dumps(movements, indent=2))
 
-          # After this cycle, the world takes one step forward, and the 
-          # current time moves by <sec_per_step> amount. 
+          # After this cycle, the world takes one step forward, and the
+          # current time moves by <sec_per_step> amount.
           self.step += 1
           self.curr_time += datetime.timedelta(seconds=self.sec_per_step)
+
+          # Auto-checkpoint so a crash (API timeout etc.) loses at most
+          # CHECKPOINT_FREQ steps of progress.
+          if CHECKPOINT_FREQ and self.step % CHECKPOINT_FREQ == 0:
+            self.save()
 
           int_counter -= 1
           
@@ -543,8 +577,13 @@ class ReverieServer:
           # Ex: print persona spatial memory Isabella Rodriguez
           self.personas[" ".join(sim_command.split()[-2:])].s_mem.print_tree()
 
-        elif ("print current time" 
-              in sim_command[:18].lower()): 
+        elif sim_command.lower() == "stats":
+          # Print LLM token usage and estimated cost so far.
+          # Example: stats
+          ret_str += format_llm_stats()
+
+        elif ("print current time"
+              in sim_command[:18].lower()):
           # Print the current time of the world. 
           # Ex: print current time
           ret_str += f'{self.curr_time.strftime("%B %d, %Y, %H:%M:%S")}\n'
@@ -594,7 +633,15 @@ class ReverieServer:
 
       except:
         traceback.print_exc()
-        print ("Error.")
+        # Emergency checkpoint: a crash mid-run (commonly an API error)
+        # should not lose completed steps. The saved state can be resumed by
+        # forking from this simulation.
+        try:
+          self.save()
+          print (f"Error. Progress saved -- resume by forking "
+                 f"'{self.sim_code}'.")
+        except Exception:
+          print ("Error. (Emergency save also failed.)")
         pass
 
 

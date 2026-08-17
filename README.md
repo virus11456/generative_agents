@@ -8,33 +8,39 @@
 
 This repository accompanies our research paper titled "[Generative Agents: Interactive Simulacra of Human Behavior](https://arxiv.org/abs/2304.03442)." It contains our core simulation module for  generative agents—computational agents that simulate believable human behaviors—and their game environment. Below, we document the steps for setting up the simulation environment on your local machine and for replaying the simulation as a demo animation.
 
+## What's New in This Fork
+This fork modernizes the original codebase so it runs today:
+
+* **openai>=1.0 SDK + current models** — the retired `text-davinci-003`/`gpt-3.5-turbo` calls are served by `gpt-4o-mini` by default (configurable), and embeddings use `text-embedding-3-small`.
+* **Environment-variable configuration** — no more hand-written `utils.py`; just set `OPENAI_API_KEY` (a `.env` file works too).
+* **Multi-provider support** — set `OPENAI_BASE_URL` to point at any OpenAI-compatible endpoint (e.g. `http://localhost:11434/v1` for Ollama).
+* **On-disk LLM + embedding cache** — repeated prompts are served from a local sqlite cache, cutting API costs substantially; disable with `LLM_CACHE=0`.
+* **Parallel persona steps** — each simulation step runs all agents' cognition concurrently in a thread pool (cross-agent conversations stay serialized for safety); disable with `PARALLEL_PERSONAS=0`.
+* **Auto-checkpoint & crash recovery** — the simulation saves itself every `CHECKPOINT_FREQ` steps (default 50) and on any crash, so progress can be resumed by forking the saved simulation.
+* **Token/cost accounting** — type `stats` at the simulation prompt for live token usage and estimated cost; stats are also saved to `reverie/llm_stats.json` inside each simulation folder.
+* **Python 3.11 + Django 4.2** — dependencies updated, retired APIs replaced, and offline unit tests added under `reverie/backend_server/tests`.
+
 ## <img src="https://joonsungpark.s3.amazonaws.com:443/static/assets/characters/profile/Isabella_Rodriguez.png" alt="Generative Isabella">   Setting Up the Environment 
-To set up your environment, you will need to generate a `utils.py` file that contains your OpenAI API key and download the necessary packages.
+To set up your environment, you will need to provide your OpenAI API key and download the necessary packages.
 
-### Step 1. Generate Utils File
-In the `reverie/backend_server` folder (where `reverie.py` is located), create a new file titled `utils.py` and copy and paste the content below into the file:
+### Step 1. Configure Your API Key
+Set the `OPENAI_API_KEY` environment variable, or create a `.env` file in `reverie/backend_server` (where `reverie.py` is located) containing:
 ```
-# Copy and paste your OpenAI API Key
-openai_api_key = "<Your OpenAI API>"
-# Put your name
-key_owner = "<Name>"
-
-maze_assets_loc = "../../environment/frontend_server/static_dirs/assets"
-env_matrix = f"{maze_assets_loc}/the_ville/matrix"
-env_visuals = f"{maze_assets_loc}/the_ville/visuals"
-
-fs_storage = "../../environment/frontend_server/storage"
-fs_temp_storage = "../../environment/frontend_server/temp_storage"
-
-collision_block_id = "32125"
-
-# Verbose 
-debug = True
+OPENAI_API_KEY=<Your OpenAI API key>
+KEY_OWNER=<Name>
 ```
-Replace `<Your OpenAI API>` with your OpenAI API key, and `<name>` with your name.
- 
+Optional settings (see `reverie/backend_server/utils.py` for the full list):
+```
+OPENAI_CHAT_MODEL=gpt-4o-mini        # default chat model
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+OPENAI_BASE_URL=                     # e.g. http://localhost:11434/v1 for Ollama
+LLM_CACHE=1                          # set 0 to disable the response cache
+PARALLEL_PERSONAS=1                  # set 0 to step agents sequentially
+CHECKPOINT_FREQ=50                   # auto-save every N steps
+```
+
 ### Step 2. Install requirements.txt
-Install everything listed in the `requirements.txt` file (I strongly recommend first setting up a virtualenv as usual). A note on Python version: we tested our environment on Python 3.9.12. 
+Install everything listed in the `requirements.txt` file (I strongly recommend first setting up a virtualenv as usual). A note on Python version: this fork targets Python 3.11+ (Django 4.2, openai>=1.0).
 
 ## <img src="https://joonsungpark.s3.amazonaws.com:443/static/assets/characters/profile/Klaus_Mueller.png" alt="Generative Klaus">   Running a Simulation 
 To run a new simulation, you will need to concurrently start two servers: the environment server and the agent simulation server.

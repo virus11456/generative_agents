@@ -46,7 +46,7 @@
 	const config = {
 	  type: Phaser.AUTO,
 	  width: 1500,
-	  height: 800,
+	  height: 1072,
 	  parent: "game-container",
 	  pixelArt: true,
 	  physics: {
@@ -81,6 +81,13 @@
 	let player;
 	let showDebug = false;
 
+	// Camera helpers: the default view fits the whole town in the canvas;
+	// the mouse wheel / buttons zoom between that and 3x, dragging pans.
+	let main_camera = null;
+	let fit_zoom = 0.25;
+	let map_w = 4480;
+	let map_h = 3200;
+
 	// Persona related variables. This should have the name of the persona as its 
 	// keys, and the instances of the Persona class as the values.
 	var spawn_tile_loc = {};
@@ -100,6 +107,98 @@
 	let pre_anims_direction_dict = {};
 
 	let curr_maze = "the_ville";
+
+	// #########################################################################
+	// 中文顯示層：引擎內部一律是英文（prompt 模板與解析都依賴英文），
+	// 這裡只在「顯示」時把封閉集合的地點/物件名稱與常見狀態翻成中文。
+	// 字典查不到的原文照顯示，不影響模擬。
+	// #########################################################################
+	const VILLE_ZH = {
+	  "the Ville": "小鎮",
+	  // 區域
+	  "artist's co-living space": "藝術家共居空間",
+	  "The Rose and Crown Pub": "玫瑰皇冠酒吧",
+	  "Hobbs Cafe": "霍布斯咖啡館",
+	  "Oak Hill College": "橡丘學院",
+	  "Johnson Park": "強森公園",
+	  "Harvey Oak Supply Store": "哈維橡木五金行",
+	  "The Willows Market and Pharmacy": "柳樹超市藥局",
+	  "Dorm for Oak Hill College": "橡丘學院宿舍",
+	  // 場所
+	  "bathroom": "浴室", "cafe": "咖啡館", "classroom": "教室",
+	  "common room": "交誼廳", "empty bedroom": "空房", "garden": "花園",
+	  "hallway": "走廊", "kitchen": "廚房", "library": "圖書室",
+	  "main room": "主廳", "man's bathroom": "男廁", "park": "公園",
+	  "pub": "酒吧", "store": "商店", "supply store": "五金行",
+	  "woman's bathroom": "女廁",
+	  // 物件
+	  "bar customer seating": "吧檯客席", "bathroom sink": "洗手台",
+	  "bed": "床", "behind the bar counter": "吧檯後方",
+	  "behind the cafe counter": "咖啡吧檯後方",
+	  "behind the grocery counter": "雜貨櫃檯後方",
+	  "behind the pharmacy counter": "藥局櫃檯後方",
+	  "behind the supply store counter": "五金行櫃檯後方",
+	  "blackboard": "黑板", "bookshelf": "書架",
+	  "cafe customer seating": "咖啡館座位",
+	  "classroom podium": "講台", "classroom student seating": "學生座位",
+	  "closet": "衣櫃", "common room sofa": "交誼廳沙發",
+	  "common room table": "交誼廳桌", "computer": "電腦",
+	  "computer desk": "電腦桌", "cooking area": "料理區", "desk": "書桌",
+	  "dorm garden": "宿舍花園", "easel": "畫架", "game console": "遊戲機",
+	  "garden chair": "花園椅", "grocery store counter": "雜貨櫃檯",
+	  "grocery store shelf": "雜貨貨架", "guitar": "吉他", "harp": "豎琴",
+	  "house garden": "庭院", "kitchen sink": "廚房水槽",
+	  "library sofa": "圖書室沙發", "library table": "圖書室桌",
+	  "lifting weight": "舉重器材", "microphone": "麥克風",
+	  "park garden": "公園綠地", "pharmacy store counter": "藥局櫃檯",
+	  "pharmacy store shelf": "藥局貨架", "piano": "鋼琴",
+	  "pool table": "撞球桌", "refrigerator": "冰箱", "shelf": "置物架",
+	  "shower": "淋浴間", "supply store counter": "五金行櫃檯",
+	  "supply store product shelf": "五金行貨架", "toaster": "烤麵包機",
+	  "toilet": "馬桶",
+	  // 常見狀態
+	  "sleeping": "睡覺中 😴", "idle": "待機中",
+	};
+
+	function villeZhSegment(seg) {
+	  seg = (seg || "").trim();
+	  if (VILLE_ZH[seg]) return VILLE_ZH[seg];
+	  let m;
+	  if ((m = seg.match(/^(.+) family's house$/)))
+	    return m[1].replace(/ and /g, "與") + " 家住宅";
+	  if ((m = seg.match(/^(.+)'s (bedroom|room|bathroom|apartment|house)$/))) {
+	    const kind = { bedroom: "臥室", room: "房間", bathroom: "浴室",
+	                   apartment: "公寓", house: "家" }[m[2]];
+	    return m[1].replace(/ and /g, "與") + " 的" + kind;
+	  }
+	  return seg;
+	}
+
+	function villeZhAddress(addr) {
+	  if (!addr) return "";
+	  return addr.split(":").map(villeZhSegment).join(" › ");
+	}
+
+	function villeZhAction(action) {
+	  if (!action) return "";
+	  const trimmed = action.trim();
+	  return VILLE_ZH[trimmed] || trimmed;
+	}
+
+	function villeZhTime(time_str) {
+	  // 引擎時間格式："February 13, 2023, 14:30:20" → 中文日期
+	  const m = (time_str || "").match(/^(\w+) (\d+), (\d+), (\d+):(\d+):\d+$/);
+	  if (!m) return time_str;
+	  const months = { January: 1, February: 2, March: 3, April: 4, May: 5,
+	                   June: 6, July: 7, August: 8, September: 9, October: 10,
+	                   November: 11, December: 12 };
+	  const month = months[m[1]];
+	  if (!month) return time_str;
+	  const date = new Date(parseInt(m[3]), month - 1, parseInt(m[2]));
+	  const weekday = "日一二三四五六"[date.getDay()];
+	  return m[3] + " 年 " + month + " 月 " + m[2] + " 日（週" + weekday +
+	         "）" + m[4] + ":" + m[5];
+	}
 
 	// <tile_width> is the width of one individual tile (tiles are square)
 	let tile_width = 32;
@@ -270,11 +369,41 @@
 	                setSize(30, 40).
 	                setOffset(0, 0);
 	  player.setDepth(-1);
-	  // Setting up the camera. 
+	  // Setting up the camera: no follow target -- we drive scrollX/scrollY
+	  // directly (arrow keys, drag) so the whole town can stay in view.
 	  const camera = this.cameras.main;
-	  camera.startFollow(player);
 	  camera.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
 	  cursors = this.input.keyboard.createCursorKeys();
+
+	  map_w = map.widthInPixels;
+	  map_h = map.heightInPixels;
+	  fit_zoom = Math.min(camera.width / map_w, camera.height / map_h);
+	  main_camera = camera;
+	  camera.setZoom(fit_zoom);
+	  camera.centerOn(map_w / 2, map_h / 2);
+
+	  // Mouse wheel zooms (whole town <-> 3x), dragging pans.
+	  this.input.on("wheel", (pointer, objects, dx, dy) => {
+	    const factor = dy > 0 ? 0.85 : 1.18;
+	    camera.setZoom(Phaser.Math.Clamp(camera.zoom * factor, fit_zoom, 3));
+	  });
+	  this.input.on("pointermove", (p) => {
+	    if (!p.isDown) return;
+	    camera.scrollX -= (p.x - p.prevPosition.x) / camera.zoom;
+	    camera.scrollY -= (p.y - p.prevPosition.y) / camera.zoom;
+	  });
+
+	  // Buttons on the dashboard call these.
+	  window.villeZoomBy = function(factor) {
+	    if (!main_camera) return;
+	    main_camera.setZoom(
+	      Phaser.Math.Clamp(main_camera.zoom * factor, fit_zoom, 3));
+	  };
+	  window.villeZoomFit = function() {
+	    if (!main_camera) return;
+	    main_camera.setZoom(fit_zoom);
+	    main_camera.centerOn(map_w / 2, map_h / 2);
+	  };
 
 	  // *** SET UP PERSONAS *** 
 	  // We start by creating the game sprite objects. 
@@ -345,24 +474,22 @@
 			game_pause();
 		};
 
-	  // *** MOVE CAMERA *** 
-	  // This is where we finish up the camera setting we started in the create() 
-	  // function. We set the movement speed of the camera and wire up the keys to
-	  // map to the actual movement.
-	  const camera_speed = 400;
-	  // Stop any previous movement from the last frame
-	  player.body.setVelocity(0);
+	  // *** MOVE CAMERA ***
+	  // Arrow keys pan the camera directly (setBounds clamps at the edges;
+	  // panning distance is zoom-compensated so it feels constant on screen).
+	  const cam = this.cameras.main;
+	  const pan = 500 * (delta / 1000) / cam.zoom;
 	  if (cursors.left.isDown) {
-	    player.body.setVelocityX(-camera_speed);
-	  } 
+	    cam.scrollX -= pan;
+	  }
 	  if (cursors.right.isDown) {
-	    player.body.setVelocityX(camera_speed);
-	  } 
+	    cam.scrollX += pan;
+	  }
 	  if (cursors.up.isDown) {
-	    player.body.setVelocityY(-camera_speed);
-	  } 
+	    cam.scrollY -= pan;
+	  }
 	  if (cursors.down.isDown) {
-	    player.body.setVelocityY(camera_speed);
+	    cam.scrollY += pan;
 	  }
 
 	  // console.log("phase: " + phase + ", step: " + step);
@@ -431,7 +558,7 @@
 	    // (or some personas might not move if they choose not to). 
 	    // The execute_count_max is computed by tile_width/movement_speed, which
 	    // defines a one step sequence in this world. 
-	    document.getElementById("game-time-content").innerHTML = execute_movement["meta"]["curr_time"];
+	    document.getElementById("game-time-content").innerHTML = villeZhTime(execute_movement["meta"]["curr_time"]);
 	    for (let i=0; i<Object.keys(personas).length; i++) {
 	      let curr_persona_name = Object.keys(personas)[i];
 	      let curr_persona = personas[curr_persona_name];
@@ -532,12 +659,12 @@
 		        	chat_content += execute_movement["persona"][curr_persona_name]["chat"][j][0] + ": " + execute_movement["persona"][curr_persona_name]["chat"][j][1] + "<br>"
 		        }
 		      } else {
-		      	chat_content = "<em>None at the moment</em>"
+		      	chat_content = "<em>目前沒有對話</em>"
 		      }
 	        // action_description += description_content + "<br>";
 
-	        document.getElementById("current_action__"+curr_persona_name_os).innerHTML = description_content.split("@")[0];
-	        document.getElementById("target_address__"+curr_persona_name_os).innerHTML = description_content.split("@")[1];
+	        document.getElementById("current_action__"+curr_persona_name_os).innerHTML = villeZhAction(description_content.split("@")[0]);
+	        document.getElementById("target_address__"+curr_persona_name_os).innerHTML = villeZhAddress(description_content.split("@")[1]);
 	        document.getElementById("chat__"+curr_persona_name_os).innerHTML = chat_content;
 	      }
 	      

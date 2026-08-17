@@ -23,6 +23,7 @@ import json
 import numpy
 import datetime
 import pickle
+import random
 import time
 import math
 import os
@@ -33,6 +34,7 @@ from global_methods import *
 from utils import *
 from maze import *
 from persona.persona import *
+from persona.cognitive_modules.plan import apply_pending_reactions
 from events import EventManager
 import chronicle
 from persona.prompt_template.gpt_structure import (format_llm_stats,
@@ -235,41 +237,61 @@ class ReverieServer:
 
   def _apply_pending_interventions(self):
     """
-    The frontend's /intervene page queues whispers into
-    <fs_temp_storage>/interventions.json. Between simulation steps we pick
-    them up and inject them into the personas' memory streams. Whispers for
-    personas that have not taken a step yet (no curr_time) are left queued
-    for the next cycle.
+    The frontend's /intervene page queues whispers as one file per whisper
+    under <fs_temp_storage>/interventions/ (one-file-per-command avoids
+    read-modify-write races with the web server). Between simulation steps
+    we pick them up and inject them into the personas' memory streams.
+    Whispers for personas that have not taken a step yet (no curr_time)
+    stay queued for the next cycle.
     """
-    interventions_file = f"{fs_temp_storage}/interventions.json"
-    if not check_if_file_exists(interventions_file):
-      return
-    try:
-      with open(interventions_file) as f:
-        items = json.load(f)
-      os.remove(interventions_file)
-    except (OSError, ValueError):
-      return
+    pending = []  # (file_path_or_None, item)
 
-    requeue = []
-    for item in items:
+    # Legacy single-file queue, still consumed for compatibility.
+    legacy_file = f"{fs_temp_storage}/interventions.json"
+    if check_if_file_exists(legacy_file):
+      try:
+        with open(legacy_file) as f:
+          pending += [(None, item) for item in json.load(f)]
+        os.remove(legacy_file)
+      except (OSError, ValueError):
+        pass
+
+    interventions_dir = f"{fs_temp_storage}/interventions"
+    if os.path.isdir(interventions_dir):
+      for file_name in sorted(os.listdir(interventions_dir)):
+        if file_name.startswith(".") or not file_name.endswith(".json"):
+          continue
+        file_path = f"{interventions_dir}/{file_name}"
+        try:
+          with open(file_path) as f:
+            pending += [(file_path, json.load(f))]
+        except (OSError, ValueError):
+          os.remove(file_path)
+
+    for file_path, item in pending:
       persona_name = str(item.get("persona", "")).strip()
       whisper = str(item.get("whisper", "")).strip()
       if persona_name not in self.personas or not whisper:
         print (f"[intervene] dropped invalid whisper: {item}")
+        if file_path:
+          os.remove(file_path)
         continue
       if not self.personas[persona_name].scratch.curr_time:
-        requeue += [item]
+        # Not started yet -- leave the file queued for the next cycle.
+        if file_path is None:
+          os.makedirs(interventions_dir, exist_ok=True)
+          requeue_path = (f"{interventions_dir}/"
+                          f"legacy_{random.randint(0, 10**9)}.json")
+          with open(requeue_path, "w") as f:
+            f.write(json.dumps(item))
         continue
       try:
         load_history_via_whisper(self.personas, [[persona_name, whisper]])
         print (f"[intervene] whispered to {persona_name}: {whisper}")
       except Exception:
         traceback.print_exc()
-
-    if requeue:
-      with open(interventions_file, "w") as f:
-        f.write(json.dumps(requeue, indent=2))
+      if file_path:
+        os.remove(file_path)
 
 
   def start_path_tester_server(self):
@@ -483,6 +505,11 @@ class ReverieServer:
               move_results = list(pool.map(_move_persona, persona_names))
           else:
             move_results = [_move_persona(name) for name in persona_names]
+
+          # Chat reactions targeting personas that were mid-move are queued
+          # by plan.py; apply them now that every thread has finished, so
+          # the targets enter their conversations with consistent state.
+          apply_pending_reactions()
 
           for persona_name, (next_tile, pronunciatio,
                              description) in move_results:

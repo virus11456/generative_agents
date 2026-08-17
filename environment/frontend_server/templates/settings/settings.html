@@ -38,7 +38,7 @@
     settings to the simulation backend.</div>
   {% endif %}
 
-  <form method="post">
+  <form method="post">{% csrf_token %}
     <input type="hidden" name="token" value="{{ token }}">
 
     <label for="provider">Provider preset</label>

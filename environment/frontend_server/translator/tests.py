@@ -176,22 +176,25 @@ class ScenarioEditorTests(SimpleTestCase):
 
 
 class EventsPageTests(SimpleTestCase):
-  COMMAND_FILE = "temp_storage/event_command.json"
+  COMMANDS_DIR = "temp_storage/event_commands"
+
+  def _queued(self):
+    if not os.path.isdir(self.COMMANDS_DIR):
+      return []
+    return [json.load(open(f"{self.COMMANDS_DIR}/{name}"))
+            for name in sorted(os.listdir(self.COMMANDS_DIR))
+            if name.endswith(".json")]
+
+  def _clean(self):
+    import shutil
+    shutil.rmtree(self.COMMANDS_DIR, ignore_errors=True)
 
   def setUp(self):
     os.environ.pop("SETTINGS_TOKEN", None)
-    self._backup = None
-    if os.path.exists(self.COMMAND_FILE):
-      with open(self.COMMAND_FILE) as f:
-        self._backup = f.read()
-      os.remove(self.COMMAND_FILE)
+    self._clean()
 
   def tearDown(self):
-    if os.path.exists(self.COMMAND_FILE):
-      os.remove(self.COMMAND_FILE)
-    if self._backup is not None:
-      with open(self.COMMAND_FILE, "w") as f:
-        f.write(self._backup)
+    self._clean()
     os.environ.pop("SETTINGS_TOKEN", None)
 
   def test_get_renders(self):
@@ -210,7 +213,7 @@ class EventsPageTests(SimpleTestCase):
       "action": "add", "type": "election", "label": "test election",
       "candidates": "random", "campaign_days": "2",
       "days_from_now": "0", "every_days": "7"})
-    commands = json.load(open(self.COMMAND_FILE))
+    commands = self._queued()
     self.assertEqual(commands[0]["action"], "add")
     self.assertEqual(commands[0]["spec"]["type"], "election")
     self.assertEqual(commands[0]["spec"]["every_days"], "7")
@@ -220,21 +223,20 @@ class EventsPageTests(SimpleTestCase):
       "action": "add", "type": "broadcast", "text": "",
       "target": "all", "days_from_now": "0", "every_days": "0"})
     self.assertContains(response, "need a whisper text")
-    self.assertFalse(os.path.exists(self.COMMAND_FILE))
+    self.assertEqual(self._queued(), [])
 
   def test_add_broadcast_with_named_targets(self):
     self.client.post("/events/", {
       "action": "add", "type": "broadcast", "text": "hello",
       "target": "Isabella Rodriguez; Klaus Mueller",
       "days_from_now": "0", "every_days": "0"})
-    commands = json.load(open(self.COMMAND_FILE))
+    commands = self._queued()
     self.assertEqual(commands[0]["spec"]["target"],
                      ["Isabella Rodriguez", "Klaus Mueller"])
 
   def test_remove_queues_command(self):
     self.client.post("/events/", {"action": "remove", "id": "3"})
-    commands = json.load(open(self.COMMAND_FILE))
-    self.assertEqual(commands[0], {"action": "remove", "id": "3"})
+    self.assertEqual(self._queued(), [{"action": "remove", "id": "3"}])
 
 
 class ChroniclePageTests(SimpleTestCase):
@@ -275,22 +277,25 @@ class ChroniclePageTests(SimpleTestCase):
 
 
 class IntervenePageTests(SimpleTestCase):
-  INTERVENTIONS_FILE = "temp_storage/interventions.json"
+  INTERVENTIONS_DIR = "temp_storage/interventions"
+
+  def _queued(self):
+    if not os.path.isdir(self.INTERVENTIONS_DIR):
+      return []
+    return [json.load(open(f"{self.INTERVENTIONS_DIR}/{name}"))
+            for name in sorted(os.listdir(self.INTERVENTIONS_DIR))
+            if name.endswith(".json")]
+
+  def _clean(self):
+    import shutil
+    shutil.rmtree(self.INTERVENTIONS_DIR, ignore_errors=True)
 
   def setUp(self):
     os.environ.pop("SETTINGS_TOKEN", None)
-    self._backup = None
-    if os.path.exists(self.INTERVENTIONS_FILE):
-      with open(self.INTERVENTIONS_FILE) as f:
-        self._backup = f.read()
-      os.remove(self.INTERVENTIONS_FILE)
+    self._clean()
 
   def tearDown(self):
-    if os.path.exists(self.INTERVENTIONS_FILE):
-      os.remove(self.INTERVENTIONS_FILE)
-    if self._backup is not None:
-      with open(self.INTERVENTIONS_FILE, "w") as f:
-        f.write(self._backup)
+    self._clean()
     os.environ.pop("SETTINGS_TOKEN", None)
 
   def test_get_renders_form(self):
@@ -298,30 +303,35 @@ class IntervenePageTests(SimpleTestCase):
     self.assertEqual(response.status_code, 200)
     self.assertContains(response, "Whisper")
 
-  def test_post_queues_whisper(self):
+  def test_post_queues_whisper_as_own_file(self):
     response = self.client.post("/intervene/", {
       "persona": "Isabella Rodriguez",
       "whisper": "You are planning a party tonight",
     })
     self.assertEqual(response.status_code, 200)
-    items = json.load(open(self.INTERVENTIONS_FILE))
-    self.assertEqual(items, [{"persona": "Isabella Rodriguez",
-                              "whisper": "You are planning a party tonight"}])
+    self.assertEqual(self._queued(),
+                     [{"persona": "Isabella Rodriguez",
+                       "whisper": "You are planning a party tonight"}])
 
-  def test_post_appends_to_existing_queue(self):
+  def test_two_posts_two_files(self):
     self.client.post("/intervene/", {"persona": "A", "whisper": "one"})
     self.client.post("/intervene/", {"persona": "B", "whisper": "two"})
-    items = json.load(open(self.INTERVENTIONS_FILE))
-    self.assertEqual(len(items), 2)
-    self.assertEqual(items[1]["persona"], "B")
+    queued = self._queued()
+    self.assertEqual(len(queued), 2)
+    self.assertEqual({q["persona"] for q in queued}, {"A", "B"})
 
   def test_post_rejects_empty_fields(self):
     response = self.client.post("/intervene/", {"persona": "", "whisper": ""})
     self.assertContains(response, "required")
-    self.assertFalse(os.path.exists(self.INTERVENTIONS_FILE))
+    self.assertEqual(self._queued(), [])
 
   def test_token_protection(self):
     os.environ["SETTINGS_TOKEN"] = "s3cret"
     self.assertEqual(self.client.get("/intervene/").status_code, 403)
     self.assertEqual(
       self.client.get("/intervene/?token=s3cret").status_code, 200)
+
+  def test_remote_access_blocked_without_token(self):
+    # No SETTINGS_TOKEN configured: only localhost may use admin pages.
+    response = self.client.get("/intervene/", REMOTE_ADDR="203.0.113.5")
+    self.assertEqual(response.status_code, 403)

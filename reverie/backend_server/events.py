@@ -140,15 +140,33 @@ class EventManager:
   def _process_command_file(self, curr_time):
     if not self.temp_storage:
       return
-    command_file = f"{self.temp_storage}/event_command.json"
-    if not os.path.isfile(command_file):
-      return
-    try:
-      with open(command_file) as f:
-        commands = json.load(f)
-      os.remove(command_file)
-    except (OSError, ValueError):
-      return
+    commands = []
+
+    # Legacy single-file queue, still consumed for compatibility.
+    legacy_file = f"{self.temp_storage}/event_command.json"
+    if os.path.isfile(legacy_file):
+      try:
+        with open(legacy_file) as f:
+          commands += json.load(f)
+        os.remove(legacy_file)
+      except (OSError, ValueError):
+        pass
+
+    # One-file-per-command queue written by the /events/ page (avoids
+    # read-modify-write races with the web server).
+    commands_dir = f"{self.temp_storage}/event_commands"
+    if os.path.isdir(commands_dir):
+      for file_name in sorted(os.listdir(commands_dir)):
+        if file_name.startswith(".") or not file_name.endswith(".json"):
+          continue
+        file_path = f"{commands_dir}/{file_name}"
+        try:
+          with open(file_path) as f:
+            commands += [json.load(f)]
+        except (OSError, ValueError):
+          pass
+        os.remove(file_path)
+
     for command in commands:
       try:
         if command.get("action") == "add":
@@ -248,11 +266,20 @@ class EventManager:
       candidates = random.sample(list(personas.keys()),
                                  min(2, len(personas)))
     else:
-      candidates = [c for c in candidates if c in personas]
+      valid = [c for c in candidates if c in personas]
+      if len(valid) < len(candidates):
+        missing = [c for c in candidates if c not in personas]
+        print (f"[events] election candidates not found in this sim: "
+               f"{missing} -- falling back to random candidates")
+        valid = random.sample(list(personas.keys()),
+                              min(2, len(personas)))
+      candidates = valid
     if len(candidates) < 2:
-      print ("[events] election needs at least 2 valid candidates; "
-             "removing event")
-      self.events = [e for e in self.events if e["id"] != event["id"]]
+      # A sim with fewer than 2 personas cannot hold an election; postpone
+      # a day rather than silently cancelling a recurring event.
+      print ("[events] election needs at least 2 personas; postponing "
+             "a day")
+      event["fire_at"] = _dts(curr_time + datetime.timedelta(days=1))
       return
 
     vote_at = curr_time + datetime.timedelta(days=event["campaign_days"])
@@ -370,9 +397,10 @@ and personality.
 Output json: {{"vote": "<exact candidate full name>", "reason": "<one
 sentence, in {name}'s voice, explaining the choice>"}}"""
 
-    for _ in range(3):
+    for attempt in range(3):
       try:
-        response = json.loads(_chat_request(prompt, json_mode=True))
+        response = json.loads(_chat_request(prompt, json_mode=True,
+                                            cache_read=(attempt == 0)))
         if response.get("vote") in candidates:
           return {"vote": response["vote"],
                   "reason": str(response.get("reason", ""))[:500]}

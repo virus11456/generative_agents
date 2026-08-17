@@ -22,6 +22,34 @@ from persona.cognitive_modules.converse import *
 # This lock serializes those cross-persona interactions.
 _interaction_lock = threading.Lock()
 
+# Mutating the TARGET persona's scratch while its own move() runs in another
+# thread would corrupt its schedule, so target-side chat reactions are queued
+# here and applied by the main thread (apply_pending_reactions) after every
+# persona's move() for the step has completed. _claimed_personas prevents a
+# persona from being roped into two chats in the same step.
+_pending_lock = threading.Lock()
+_pending_target_reactions = []
+_claimed_personas = set()
+
+
+def apply_pending_reactions():
+  """
+  Called by reverie.py from the main thread once all personas' (possibly
+  parallel) move() calls for the current step have returned. Applies the
+  queued target-side chat state changes and resets the per-step claims.
+  """
+  global _pending_target_reactions
+  with _pending_lock:
+    pending = _pending_target_reactions
+    _pending_target_reactions = []
+    _claimed_personas.clear()
+  for apply_fn in pending:
+    try:
+      apply_fn()
+    except Exception:
+      import traceback
+      traceback.print_exc()
+
 ##############################################################################
 # CHAPTER 2: Generate
 ##############################################################################
@@ -865,12 +893,18 @@ def _create_react(persona, inserted_act, inserted_act_dur,
 
 def _chat_react(maze, persona, focused_event, reaction_mode, personas):
   # There are two personas -- the persona who is initiating the conversation
-  # and the persona who is the target. We get the persona instances here. 
+  # and the persona who is the target. We get the persona instances here.
   init_persona = persona
   target_persona = personas[reaction_mode[9:].strip()]
-  curr_personas = [init_persona, target_persona]
 
-  # Actually creating the conversation here. 
+  # Another initiator may have already committed one of the pair to a chat
+  # this step (its state change is pending application).
+  with _pending_lock:
+    if (init_persona.name in _claimed_personas
+        or target_persona.name in _claimed_personas):
+      return
+
+  # Actually creating the conversation here.
   convo, duration_min = generate_convo(maze, init_persona, target_persona)
   convo_summary = generate_convo_summary(init_persona, convo)
   inserted_act = convo_summary
@@ -879,35 +913,54 @@ def _chat_react(maze, persona, focused_event, reaction_mode, personas):
   act_start_time = target_persona.scratch.act_start_time
 
   curr_time = target_persona.scratch.curr_time
-  if curr_time.second != 0: 
+  if curr_time.second != 0:
     temp_curr_time = curr_time + datetime.timedelta(seconds=60 - curr_time.second)
     chatting_end_time = temp_curr_time + datetime.timedelta(minutes=inserted_act_dur)
-  else: 
+  else:
     chatting_end_time = curr_time + datetime.timedelta(minutes=inserted_act_dur)
 
-  for role, p in [("init", init_persona), ("target", target_persona)]: 
-    if role == "init": 
+  for role, p in [("init", init_persona), ("target", target_persona)]:
+    if role == "init":
       act_address = f"<persona> {target_persona.name}"
       act_event = (p.name, "chat with", target_persona.name)
       chatting_with = target_persona.name
       chatting_with_buffer = {}
       chatting_with_buffer[target_persona.name] = 800
-    elif role == "target": 
+    elif role == "target":
       act_address = f"<persona> {init_persona.name}"
       act_event = (p.name, "chat with", init_persona.name)
       chatting_with = init_persona.name
       chatting_with_buffer = {}
       chatting_with_buffer[init_persona.name] = 800
 
-    act_pronunciatio = "💬" 
+    act_pronunciatio = "💬"
     act_obj_description = None
     act_obj_pronunciatio = None
     act_obj_event = (None, None, None)
 
-    _create_react(p, inserted_act, inserted_act_dur,
-      act_address, act_event, chatting_with, convo, chatting_with_buffer, chatting_end_time,
-      act_pronunciatio, act_obj_description, act_obj_pronunciatio, 
-      act_obj_event, act_start_time)
+    if role == "init":
+      # The initiator is mutated by its own thread: safe to apply now.
+      _create_react(p, inserted_act, inserted_act_dur,
+        act_address, act_event, chatting_with, convo, chatting_with_buffer,
+        chatting_end_time, act_pronunciatio, act_obj_description,
+        act_obj_pronunciatio, act_obj_event, act_start_time)
+    else:
+      # The target may be mid-move() on another thread -- defer its state
+      # change to the main thread (applied after the step's moves finish).
+      def _apply(p=p, inserted_act=inserted_act,
+                 inserted_act_dur=inserted_act_dur, act_address=act_address,
+                 act_event=act_event, chatting_with=chatting_with,
+                 convo=convo, chatting_with_buffer=chatting_with_buffer,
+                 chatting_end_time=chatting_end_time,
+                 act_start_time=act_start_time):
+        _create_react(p, inserted_act, inserted_act_dur,
+          act_address, act_event, chatting_with, convo,
+          chatting_with_buffer, chatting_end_time, "💬", None, None,
+          (None, None, None), act_start_time)
+      with _pending_lock:
+        _pending_target_reactions.append(_apply)
+        _claimed_personas.add(init_persona.name)
+        _claimed_personas.add(target_persona.name)
 
 
 def _wait_react(persona, reaction_mode): 

@@ -354,7 +354,7 @@ class TestEventManager(unittest.TestCase):
     self.assertEqual(len(event["history"]), 1)
     self.assertEqual(event["history"][0]["winners"], ["Ana"])
 
-  def test_web_command_file_processed(self):
+  def test_web_command_legacy_file_processed(self):
     with open(f"{self.temp_storage}/event_command.json", "w") as f:
       json.dump([{"action": "add",
                   "spec": {"type": "broadcast", "text": "from web",
@@ -363,6 +363,29 @@ class TestEventManager(unittest.TestCase):
     self.assertEqual(len(self.manager.events), 1)
     self.assertFalse(
       os.path.exists(f"{self.temp_storage}/event_command.json"))
+
+  def test_web_command_dir_processed(self):
+    commands_dir = f"{self.temp_storage}/event_commands"
+    os.makedirs(commands_dir, exist_ok=True)
+    with open(f"{commands_dir}/abc.json", "w") as f:
+      json.dump({"action": "add",
+                 "spec": {"type": "broadcast", "text": "from dir",
+                          "days_from_now": "0.5"}}, f)
+    self.manager.check(self.now, self.personas)
+    self.assertEqual(len(self.manager.events), 1)
+    self.assertEqual(self.manager.events[0]["text"], "from dir")
+    self.assertEqual(os.listdir(commands_dir), [])
+
+  def test_election_bad_candidates_falls_back_to_random(self):
+    self.manager.add_event({"type": "election", "campaign_days": 1,
+                            "candidates": ["Ana", "Nobody Real"]},
+                           self.now)
+    self.manager.check(self.now, self.personas)
+    event = self.manager.events[0]
+    self.assertEqual(event["phase"], "vote")
+    self.assertEqual(len(event["resolved_candidates"]), 2)
+    for candidate in event["resolved_candidates"]:
+      self.assertIn(candidate, self.personas)
 
 
 class TestChronicle(unittest.TestCase):

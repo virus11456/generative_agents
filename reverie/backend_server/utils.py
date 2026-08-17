@@ -56,6 +56,25 @@ def _cfg(file_key, env_key, default=""):
   return _file_cfg.get(file_key) or os.environ.get(env_key, default)
 
 
+def _cfg_num(file_key, env_key, default, cast=float):
+  raw = _file_cfg.get(file_key)
+  if raw in (None, ""):
+    raw = os.environ.get(env_key, "")
+  try:
+    return cast(raw)
+  except (TypeError, ValueError):
+    return default
+
+
+def _cfg_bool(file_key, env_key, default=True):
+  raw = _file_cfg.get(file_key)
+  if raw in (None, ""):
+    raw = os.environ.get(env_key)
+  if raw in (None, ""):
+    return default
+  return str(raw).lower() not in ("0", "false", "off", "no")
+
+
 # LLM provider configuration
 openai_api_key = _cfg("api_key", "OPENAI_API_KEY")
 openai_base_url = _cfg("base_url", "OPENAI_BASE_URL")
@@ -76,13 +95,14 @@ key_owner = os.environ.get("KEY_OWNER", "Anonymous")
 # Cache / performance knobs
 # Hard spending ceiling in USD (estimated from token counts); 0 disables.
 # When the estimate reaches this, the simulation auto-saves and halts.
-cost_limit_usd = float(os.environ.get("COST_LIMIT_USD", "0") or "0")
+# These performance knobs can also be set on the /settings web page.
+cost_limit_usd = _cfg_num("cost_limit_usd", "COST_LIMIT_USD", 0.0)
 
-llm_cache_enabled = os.environ.get("LLM_CACHE", "1") != "0"
+llm_cache_enabled = _cfg_bool("llm_cache", "LLM_CACHE", True)
 llm_cache_path = os.environ.get("LLM_CACHE_PATH", "")
-parallel_personas = os.environ.get("PARALLEL_PERSONAS", "1") != "0"
+parallel_personas = _cfg_bool("parallel_personas", "PARALLEL_PERSONAS", True)
 max_parallel_workers = int(os.environ.get("MAX_PARALLEL_WORKERS", "8"))
-checkpoint_freq = int(os.environ.get("CHECKPOINT_FREQ", "50"))
+checkpoint_freq = _cfg_num("checkpoint_freq", "CHECKPOINT_FREQ", 50, int)
 
 maze_assets_loc = "../../environment/frontend_server/static_dirs/assets"
 env_matrix = f"{maze_assets_loc}/the_ville/matrix"

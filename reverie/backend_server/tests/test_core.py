@@ -4,6 +4,7 @@ access is required. Run from reverie/backend_server:
 
     python -m unittest discover tests
 """
+import json
 import os
 import sys
 import tempfile
@@ -156,6 +157,26 @@ class TestConfigFilePriority(unittest.TestCase):
     utils = self._reload_utils()
     self.assertEqual(utils.embedding_api_key, "sk-chat-key")
 
+  def test_performance_knobs_from_file(self):
+    cfg_path = os.path.join(_TMP, "llm_config3.json")
+    with open(cfg_path, "w") as f:
+      f.write('{"cost_limit_usd": "3.5", "llm_cache": "0",'
+              ' "parallel_personas": "0", "checkpoint_freq": "25"}')
+    os.environ["LLM_CONFIG_PATH"] = cfg_path
+    utils = self._reload_utils()
+    self.assertEqual(utils.cost_limit_usd, 3.5)
+    self.assertFalse(utils.llm_cache_enabled)
+    self.assertFalse(utils.parallel_personas)
+    self.assertEqual(utils.checkpoint_freq, 25)
+
+  def test_performance_knobs_defaults(self):
+    os.environ["LLM_CONFIG_PATH"] = os.path.join(_TMP, "missing2.json")
+    utils = self._reload_utils()
+    self.assertEqual(utils.cost_limit_usd, 0.0)
+    self.assertTrue(utils.llm_cache_enabled)
+    self.assertTrue(utils.parallel_personas)
+    self.assertEqual(utils.checkpoint_freq, 50)
+
 
 class TestScenarioGenerator(unittest.TestCase):
   def _identity(self, **overrides):
@@ -205,6 +226,143 @@ class TestScenarioGenerator(unittest.TestCase):
     self.assertIn("A bakery rivalry", prompt)
     self.assertIn("Kim", prompt)
     self.assertIn("Bob", prompt)
+
+
+class _FakeScratch:
+  def __init__(self, name):
+    self.name = name
+    self.curr_time = __import__("datetime").datetime(2023, 2, 13, 9, 0, 0)
+
+
+class _FakePersona:
+  def __init__(self, name):
+    self.scratch = _FakeScratch(name)
+
+
+class TestEventManager(unittest.TestCase):
+  def setUp(self):
+    import datetime
+    self.sim_folder = tempfile.mkdtemp(prefix="evt_sim_")
+    os.makedirs(f"{self.sim_folder}/reverie", exist_ok=True)
+    self.temp_storage = tempfile.mkdtemp(prefix="evt_tmp_")
+    self.whispers = []
+    self.now = datetime.datetime(2023, 2, 13, 9, 0, 0)
+    self.personas = {n: _FakePersona(n)
+                     for n in ["Ana", "Bo", "Cy", "Di"]}
+
+    import events
+    self.manager = events.EventManager(
+      self.sim_folder, self.temp_storage,
+      whisper_fn=lambda personas, name, text:
+        self.whispers.append((name, text)),
+      vote_fn=lambda persona, candidates:
+        {"vote": candidates[0], "reason": "test reason"})
+
+  def tearDown(self):
+    import shutil
+    shutil.rmtree(self.sim_folder, ignore_errors=True)
+    shutil.rmtree(self.temp_storage, ignore_errors=True)
+
+  def test_tally_votes(self):
+    from events import tally_votes
+    votes = {"a": {"vote": "X"}, "b": {"vote": "X"}, "c": {"vote": "Y"},
+             "d": {"vote": "nobody"}, "e": {"vote": None}}
+    counts, winners = tally_votes(votes, ["X", "Y"])
+    self.assertEqual(counts, {"X": 2, "Y": 1})
+    self.assertEqual(winners, ["X"])
+
+  def test_tally_tie(self):
+    from events import tally_votes
+    counts, winners = tally_votes(
+      {"a": {"vote": "X"}, "b": {"vote": "Y"}}, ["X", "Y"])
+    self.assertEqual(sorted(winners), ["X", "Y"])
+
+  def test_add_save_load_roundtrip(self):
+    import events
+    self.manager.add_event({"type": "broadcast", "text": "hello",
+                            "days_from_now": 1}, self.now)
+    reloaded = events.EventManager(self.sim_folder)
+    self.assertEqual(len(reloaded.events), 1)
+    self.assertEqual(reloaded.events[0]["text"], "hello")
+
+  def test_broadcast_fires_when_due_and_one_shot_removes(self):
+    self.manager.add_event({"type": "broadcast", "text": "market day",
+                            "target": "all"}, self.now)
+    self.manager.check(self.now, self.personas)
+    self.assertEqual(len(self.whispers), 4)
+    self.assertIn(("Ana", "market day"), self.whispers)
+    self.assertEqual(self.manager.events, [])
+
+  def test_broadcast_not_due_does_not_fire(self):
+    self.manager.add_event({"type": "broadcast", "text": "later",
+                            "days_from_now": 2}, self.now)
+    self.manager.check(self.now, self.personas)
+    self.assertEqual(self.whispers, [])
+    self.assertEqual(len(self.manager.events), 1)
+
+  def test_broadcast_recurrence_reschedules(self):
+    import datetime
+    self.manager.add_event({"type": "broadcast", "text": "weekly",
+                            "every_days": 7}, self.now)
+    self.manager.check(self.now, self.personas)
+    self.assertEqual(len(self.manager.events), 1)
+    from events import _dt
+    self.assertEqual(_dt(self.manager.events[0]["fire_at"]),
+                     self.now + datetime.timedelta(days=7))
+
+  def test_broadcast_random_target_count(self):
+    self.manager.add_event({"type": "broadcast", "text": "psst",
+                            "target": "random:2"}, self.now)
+    self.manager.check(self.now, self.personas)
+    self.assertEqual(len(self.whispers), 2)
+
+  def test_election_full_cycle(self):
+    import datetime
+    self.manager.add_event({"type": "election", "campaign_days": 1,
+                            "candidates": ["Ana", "Bo"]}, self.now)
+    # Announce fires now: everyone hears about it, candidates campaign.
+    self.manager.check(self.now, self.personas)
+    self.assertEqual(len(self.whispers), 4)
+    candidate_whispers = [t for n, t in self.whispers
+                          if "running for mayor" in t and "You are" in t]
+    self.assertEqual(len(candidate_whispers), 2)
+    event = self.manager.events[0]
+    self.assertEqual(event["phase"], "vote")
+
+    # Vote fires one game day later: everyone voted Ana (mock vote_fn).
+    self.whispers.clear()
+    vote_day = self.now + datetime.timedelta(days=1)
+    self.manager.check(vote_day, self.personas)
+    self.assertEqual(self.manager.events, [])  # one-shot: removed
+    self.assertEqual(len(self.whispers), 4)
+    winner_whispers = [t for n, t in self.whispers
+                       if n == "Ana" and "You won" in t]
+    self.assertEqual(len(winner_whispers), 1)
+
+  def test_recurring_election_resets_phase(self):
+    import datetime
+    self.manager.add_event({"type": "election", "campaign_days": 1,
+                            "candidates": ["Ana", "Bo"],
+                            "every_days": 7}, self.now)
+    self.manager.check(self.now, self.personas)                # announce
+    self.manager.check(self.now + datetime.timedelta(days=1),
+                       self.personas)                          # vote
+    self.assertEqual(len(self.manager.events), 1)
+    event = self.manager.events[0]
+    self.assertEqual(event["phase"], "announce")
+    self.assertNotIn("resolved_candidates", event)
+    self.assertEqual(len(event["history"]), 1)
+    self.assertEqual(event["history"][0]["winners"], ["Ana"])
+
+  def test_web_command_file_processed(self):
+    with open(f"{self.temp_storage}/event_command.json", "w") as f:
+      json.dump([{"action": "add",
+                  "spec": {"type": "broadcast", "text": "from web",
+                           "days_from_now": "0.5"}}], f)
+    self.manager.check(self.now, self.personas)
+    self.assertEqual(len(self.manager.events), 1)
+    self.assertFalse(
+      os.path.exists(f"{self.temp_storage}/event_command.json"))
 
 
 if __name__ == "__main__":

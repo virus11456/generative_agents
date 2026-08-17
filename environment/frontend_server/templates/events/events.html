@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>World Events</title>
+  <style>
+    body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+           background: #f4f4f6; margin: 0; padding: 2rem; color: #222; }
+    .card { max-width: 760px; margin: 0 auto 1.5rem; background: #fff;
+            border-radius: 10px; padding: 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+    h1 { margin-top: 0; font-size: 1.4rem; }
+    h2 { font-size: 1.05rem; margin-top: 0; }
+    h3 { font-size: .95rem; margin: 1rem 0 .3rem; }
+    label { display: block; margin: .9rem 0 .25rem; font-weight: 600;
+            font-size: .85rem; }
+    input, select, textarea { width: 100%; box-sizing: border-box;
+                    padding: .5rem; border: 1px solid #ccc;
+                    border-radius: 6px; font-size: .92rem; }
+    textarea { min-height: 80px; resize: vertical; }
+    .hint { font-size: .78rem; color: #666; margin-top: .2rem; }
+    button { padding: .55rem 1rem; background: #b45309; color: #fff;
+             border: 0; border-radius: 6px; font-size: .95rem;
+             cursor: pointer; }
+    button:hover { background: #92400e; }
+    button.primary { margin-top: 1.4rem; width: 100%; padding: .7rem;
+                     font-size: 1rem; }
+    button.small { padding: .3rem .7rem; font-size: .8rem;
+                   background: #dc2626; }
+    button.small:hover { background: #b91c1c; }
+    button.preset { background: #eef2ff; color: #3730a3;
+                    border: 1px solid #c7d2fe; margin: .25rem .25rem 0 0; }
+    button.preset:hover { background: #e0e7ff; }
+    .ok { background: #ecfdf5; border: 1px solid #10b981; color: #065f46;
+          padding: .6rem .8rem; border-radius: 6px; margin-bottom: 1rem; }
+    .err { background: #fef2f2; border: 1px solid #ef4444; color: #991b1b;
+           padding: .6rem .8rem; border-radius: 6px; margin-bottom: 1rem; }
+    .event { border: 1px solid #e5e7eb; border-radius: 8px;
+             padding: 1rem; margin: .8rem 0; }
+    .event .meta { font-size: .82rem; color: #555; margin: .3rem 0; }
+    table { width: 100%; border-collapse: collapse; font-size: .85rem;
+            margin-top: .5rem; }
+    th, td { text-align: left; border-bottom: 1px solid #eee;
+             padding: .35rem .4rem; vertical-align: top; }
+    details { margin-top: .5rem; }
+    summary { cursor: pointer; font-size: .85rem; color: #2563eb; }
+    .winner { color: #059669; font-weight: 700; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>World Events</h1>
+
+  {% if queued %}
+  <div class="ok">Command queued. The simulation backend applies it between
+    steps -- it must be running (<code>run &lt;count&gt;</code>).</div>
+  {% endif %}
+  {% if error %}
+  <div class="err">{{ error }}</div>
+  {% endif %}
+
+  <h2>Schedule an event</h2>
+  <div class="hint">Quick presets:</div>
+  <div>
+    <button type="button" class="preset" onclick="preset('election7')">🗳️ Recurring election (every 7 days)</button>
+    <button type="button" class="preset" onclick="preset('election1')">🗳️ Election tomorrow</button>
+    <button type="button" class="preset" onclick="preset('market')">🧺 Weekly market</button>
+    <button type="button" class="preset" onclick="preset('party')">🎉 Party tonight</button>
+    <button type="button" class="preset" onclick="preset('rumor')">🤫 Plant a rumor</button>
+  </div>
+
+  <form method="post">
+    <input type="hidden" name="token" value="{{ token }}">
+    <input type="hidden" name="action" value="add">
+
+    <label for="type">Event type</label>
+    <select id="type" name="type" onchange="toggleType()">
+      <option value="election">Election (announce &rarr; campaign &rarr; vote &rarr; results)</option>
+      <option value="broadcast">Broadcast (festival / news / rumor / custom whisper)</option>
+    </select>
+
+    <label for="label">Label</label>
+    <input id="label" name="label" placeholder="e.g. mayoral election">
+
+    <div id="election_fields">
+      <label for="candidates">Candidates</label>
+      <input id="candidates" name="candidates" value="random"
+             placeholder='random, or "Sam Moore; Tom Moreno"'>
+      <div class="hint">"random" picks two random residents each cycle.</div>
+
+      <label for="campaign_days">Campaign length (game days)</label>
+      <input id="campaign_days" name="campaign_days" type="number"
+             step="0.5" min="0.5" value="2">
+      <div class="hint">Time between the announcement and the vote, during
+        which the town discusses the election.</div>
+    </div>
+
+    <div id="broadcast_fields" style="display:none">
+      <label for="text">Whisper text (addressed to each agent as "you")</label>
+      <textarea id="text" name="text"
+        placeholder="e.g. There is a big market in the plaza today and you want to check it out"></textarea>
+
+      <label for="target">Recipients</label>
+      <input id="target" name="target" value="all"
+             placeholder='all, random:3, or "Isabella Rodriguez; Klaus Mueller"'>
+    </div>
+
+    <label for="days_from_now">Starts in (game days from now)</label>
+    <input id="days_from_now" name="days_from_now" type="number" step="0.1"
+           min="0" value="0">
+    <div class="hint">0 = on the next simulation step.</div>
+
+    <label for="every_days">Repeat every (game days)</label>
+    <input id="every_days" name="every_days" type="number" step="0.5"
+           min="0" value="0">
+    <div class="hint">0 = one-shot event.</div>
+
+    <button type="submit" class="primary">Schedule event</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Scheduled events &amp; history{% if sim_code %} -- {{ sim_code }}{% endif %}</h2>
+  {% if not events %}
+  <p class="hint">No events scheduled{% if not sim_code %} (no running
+    simulation detected){% endif %}.</p>
+  {% endif %}
+  {% for e in events %}
+  <div class="event">
+    <strong>#{{ e.id }} {{ e.label }}</strong> ({{ e.type }})
+    <form method="post" style="display:inline; float:right">
+      <input type="hidden" name="token" value="{{ token }}">
+      <input type="hidden" name="action" value="remove">
+      <input type="hidden" name="id" value="{{ e.id }}">
+      <button type="submit" class="small">Cancel</button>
+    </form>
+    <div class="meta">
+      Next: {{ e.fire_at }}{% if e.every_days %} &middot; repeats every
+      {{ e.every_days }} game days{% endif %}
+      {% if e.type == "election" %} &middot; phase: {{ e.phase }}
+      {% if e.resolved_candidates %} &middot; candidates:
+      {{ e.resolved_candidates|join:", " }}{% endif %}{% endif %}
+    </div>
+    {% for h in e.history reversed %}
+    <details {% if forloop.first %}open{% endif %}>
+      <summary>{{ h.at }}{% if h.winners %} -- winner:
+        {{ h.winners|join:" & " }}{% endif %}</summary>
+      {% if h.counts %}
+      <table>
+        <tr><th>Candidate</th><th>Votes</th></tr>
+        {% for cand, n in h.counts.items %}
+        <tr><td {% if cand in h.winners %}class="winner"{% endif %}>{{ cand }}</td><td>{{ n }}</td></tr>
+        {% endfor %}
+      </table>
+      <details>
+        <summary>Individual votes &amp; reasons</summary>
+        <table>
+          <tr><th>Voter</th><th>Vote</th><th>Reason</th></tr>
+          {% for voter, v in h.votes.items %}
+          <tr><td>{{ voter }}</td><td>{{ v.vote|default:"(abstain)" }}</td><td>{{ v.reason }}</td></tr>
+          {% endfor %}
+        </table>
+      </details>
+      {% elif h.targets %}
+      <div class="meta">Delivered to: {{ h.targets|join:", " }}</div>
+      {% endif %}
+    </details>
+    {% endfor %}
+  </div>
+  {% endfor %}
+</div>
+
+<script>
+  function toggleType() {
+    const isElection = document.getElementById("type").value === "election";
+    document.getElementById("election_fields").style.display =
+      isElection ? "" : "none";
+    document.getElementById("broadcast_fields").style.display =
+      isElection ? "none" : "";
+  }
+  const PRESETS = {
+    election7: { type: "election", label: "recurring mayoral election",
+                 candidates: "random", campaign_days: 2,
+                 days_from_now: 0, every_days: 7 },
+    election1: { type: "election", label: "mayoral election",
+                 candidates: "random", campaign_days: 1,
+                 days_from_now: 0, every_days: 0 },
+    market:    { type: "broadcast", label: "weekly market",
+                 text: "There is a lively weekly market in the Ville today with food stalls and music, and you want to visit it and chat with people there",
+                 target: "all", days_from_now: 0, every_days: 7 },
+    party:     { type: "broadcast", label: "party tonight",
+                 text: "There is a party at Hobbs Cafe tonight at 7pm and you are invited; you want to go and you want to invite others",
+                 target: "all", days_from_now: 0, every_days: 0 },
+    rumor:     { type: "broadcast", label: "rumor",
+                 text: "You heard a surprising rumor that someone in the Ville won a big lottery prize and is hiding it; you are curious and want to find out who",
+                 target: "random:3", days_from_now: 0, every_days: 0 },
+  };
+  function preset(name) {
+    const p = PRESETS[name];
+    for (const [key, value] of Object.entries(p)) {
+      const element = document.getElementById(key);
+      if (element) element.value = value;
+    }
+    toggleType();
+  }
+</script>
+</body>
+</html>

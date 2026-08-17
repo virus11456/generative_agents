@@ -33,6 +33,7 @@ from global_methods import *
 from utils import *
 from maze import *
 from persona.persona import *
+from events import EventManager
 from persona.prompt_template.gpt_structure import (format_llm_stats,
                                                    get_llm_stats,
                                                    save_llm_stats)
@@ -148,6 +149,10 @@ class ReverieServer:
 
     # Whether the 80%-of-cost-limit warning has been printed yet.
     self._cost_warned = False
+
+    # World-event engine (elections, festivals, rumors, custom broadcasts).
+    # Events persist in <sim_folder>/reverie/events.json across save/fork.
+    self.events = EventManager(sim_folder, fs_temp_storage)
 
     # SIGNALING THE FRONTEND SERVER: 
     # curr_sim_code.json contains the current simulation code, and
@@ -384,6 +389,9 @@ class ReverieServer:
         if env_retrieved:
           # Apply any whispers queued from the frontend's /intervene page.
           self._apply_pending_interventions()
+
+          # Fire any due world events (elections, festivals, rumors...).
+          self.events.check(self.curr_time, self.personas)
 
           # This is where we go through <game_obj_cleanup> to clean up all
           # object actions that were used in this cylce.
@@ -657,6 +665,14 @@ class ReverieServer:
             "planning a party tonight\n"
             "  interview <persona>             -- chat with a persona (does not alter "
             "its memory)\n"
+            "  event list                      -- show scheduled world events\n"
+            "  event remove <id>               -- cancel a scheduled event\n"
+            "  election start <days>: <A>; <B> -- one-shot election, vote in <days> game days\n"
+            "                                     (use 'random' for random candidates)\n"
+            "  election auto <interval> <campaign>: <A>; <B>\n"
+            "                                  -- recurring election every <interval> days\n"
+            "  election vote now               -- force the pending election to fire next step\n"
+            "  election off                    -- cancel all elections\n"
             "  print persona schedule <persona>\n"
             "  print all persona schedule\n"
             "  print persona current tile <persona>\n"
@@ -685,6 +701,73 @@ class ReverieServer:
             load_history_via_whisper(self.personas,
                                      [[persona_name, whisper]])
             ret_str += f"Whispered to {persona_name}: {whisper}"
+
+        elif sim_command.lower() == "event list":
+          # Show all scheduled world events.
+          ret_str += self.events.status_str()
+
+        elif sim_command[:12].lower() == "event remove":
+          # Cancel a scheduled event by id. Example: event remove 2
+          if self.events.remove_event(sim_command[12:].strip()):
+            ret_str += "Event removed."
+          else:
+            ret_str += "No such event id."
+
+        elif sim_command[:14].lower() == "election start":
+          # One-shot election. Examples:
+          #   election start 2: Sam Moore; Tom Moreno
+          #   election start 2: random
+          head, sep, cand = sim_command[14:].partition(":")
+          campaign_days = float(head.strip() or 1)
+          cand = cand.strip()
+          candidates = ("random" if cand.lower() in ("", "random")
+                        else [c.strip() for c in cand.split(";")
+                              if c.strip()])
+          event = self.events.add_event(
+            {"type": "election", "label": "mayoral election",
+             "campaign_days": campaign_days, "candidates": candidates},
+            self.curr_time)
+          ret_str += (f"Election #{event['id']} scheduled -- campaign "
+                      f"starts next step, vote in {campaign_days:g} game "
+                      f"day(s).")
+
+        elif sim_command[:13].lower() == "election auto":
+          # Recurring election. Example:
+          #   election auto 7 2: random
+          head, sep, cand = sim_command[13:].partition(":")
+          parts = head.split()
+          interval_days = float(parts[0]) if parts else 7
+          campaign_days = float(parts[1]) if len(parts) > 1 else 1
+          cand = cand.strip()
+          candidates = ("random" if cand.lower() in ("", "random")
+                        else [c.strip() for c in cand.split(";")
+                              if c.strip()])
+          event = self.events.add_event(
+            {"type": "election", "label": "recurring mayoral election",
+             "campaign_days": campaign_days, "candidates": candidates,
+             "every_days": interval_days}, self.curr_time)
+          ret_str += (f"Recurring election #{event['id']} scheduled -- "
+                      f"every {interval_days:g} game days, "
+                      f"{campaign_days:g}-day campaign.")
+
+        elif sim_command.lower() == "election vote now":
+          # Pull every pending election's next phase to the next step.
+          n = 0
+          for event in self.events.events:
+            if event["type"] == "election":
+              event["fire_at"] = self.curr_time.strftime(
+                "%B %d, %Y, %H:%M:%S")
+              n += 1
+          self.events.save()
+          ret_str += (f"{n} election event(s) will fire on the next step."
+                      if n else "No election events scheduled.")
+
+        elif sim_command.lower() == "election off":
+          election_ids = [e["id"] for e in self.events.events
+                          if e["type"] == "election"]
+          for event_id in election_ids:
+            self.events.remove_event(event_id)
+          ret_str += f"Removed {len(election_ids)} election event(s)."
 
         elif sim_command[:9].lower() == "interview":
           # Stateless chat session with a persona (alias for

@@ -32,6 +32,7 @@ urlpatterns = [
     re_path(r'^path_tester_update/$', translator_views.path_tester_update, name='path_tester_update'),
     re_path(r'^settings/$', translator_views.llm_settings, name='llm_settings'),
     re_path(r'^intervene/$', translator_views.intervene, name='intervene'),
+    re_path(r'^events/$', translator_views.events_page, name='events_page'),
     re_path(r'^scenario/$', translator_views.scenario_home, name='scenario_home'),
     re_path(r'^scenario/(?P<sim_code>[\w-]+)/$', translator_views.scenario_edit, name='scenario_edit'),
     path('admin/', admin.site.urls),

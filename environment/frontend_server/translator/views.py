@@ -616,3 +616,89 @@ def scenario_edit(request, sim_code):
              "saved": saved,
              "token": token}
   return render(request, "scenario/scenario_edit.html", context)
+
+
+# ============================================================================
+# World events page (elections, festivals, rumors, custom broadcasts)
+# ============================================================================
+
+def _queue_event_command(command):
+  command_file = "temp_storage/event_command.json"
+  try:
+    with open(command_file) as f:
+      commands = json.load(f)
+  except (OSError, ValueError):
+    commands = []
+  commands += [command]
+  tmp_file = command_file + ".tmp"
+  with open(tmp_file, "w") as f:
+    f.write(json.dumps(commands, indent=2))
+  os.replace(tmp_file, command_file)
+
+
+def events_page(request):
+  """
+  Schedule world events (elections, festivals, rumors, custom broadcasts)
+  and browse their history, including per-agent election votes. Commands
+  are queued for the simulation backend, which applies them between steps.
+  """
+  forbidden, token = _token_forbidden(request)
+  if forbidden:
+    return forbidden
+
+  queued = False
+  error = ""
+  if request.method == "POST":
+    action = request.POST.get("action", "")
+    if action == "remove":
+      _queue_event_command({"action": "remove",
+                            "id": request.POST.get("id", "")})
+      queued = True
+    elif action == "add":
+      event_type = request.POST.get("type", "")
+      spec = {"type": event_type,
+              "label": request.POST.get("label", "").strip(),
+              "days_from_now": request.POST.get("days_from_now",
+                                                "0").strip() or "0",
+              "every_days": request.POST.get("every_days",
+                                             "0").strip() or "0"}
+      if event_type == "broadcast":
+        spec["text"] = request.POST.get("text", "").strip()
+        target = request.POST.get("target", "all").strip()
+        if target not in ("all",) and not target.startswith("random:"):
+          target = [t.strip() for t in target.split(";") if t.strip()]
+        spec["target"] = target
+        if not spec["text"]:
+          error = "Broadcast events need a whisper text."
+      elif event_type == "election":
+        candidates = request.POST.get("candidates", "random").strip()
+        if candidates.lower() != "random":
+          candidates = [c.strip() for c in candidates.split(";")
+                        if c.strip()]
+          if len(candidates) < 2:
+            error = "Elections need 'random' or at least two candidates."
+        spec["candidates"] = candidates
+        spec["campaign_days"] = request.POST.get("campaign_days",
+                                                 "1").strip() or "1"
+      else:
+        error = "Unknown event type."
+      if not error:
+        _queue_event_command({"action": "add", "spec": spec})
+        queued = True
+
+  sim_code, persona_names = _current_sim_personas()
+  events = []
+  if sim_code:
+    try:
+      with open(f"storage/{sim_code}/reverie/events.json") as f:
+        events = json.load(f).get("events", [])
+    except (OSError, ValueError):
+      pass
+
+  context = {"sim_code": sim_code,
+             "persona_names": persona_names,
+             "events": events,
+             "queued": queued,
+             "error": error,
+             "token": token}
+  return render(request, "events/events.html", context)

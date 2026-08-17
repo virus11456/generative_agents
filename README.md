@@ -30,6 +30,7 @@ This repository accompanies our research paper titled "[Generative Agents: Inter
 | Docker 一鍵部署 | `docker compose up -d` 啟動網頁伺服器、`docker compose run --rm backend` 啟動模擬，免裝 Python 環境 |
 | 成本上限保護 | 設 `COST_LIMIT_USD` 預算上限，花費達 80% 警告、達 100% 自動存檔停止，防止掛機跑出天價帳單 |
 | 劇本產生器 + 網頁編輯器 | 一句話的故事設定（中英文皆可）→ 自動生成所有角色的人設、目標、人際關係；`/scenario/` 頁面可直接在瀏覽器生成與逐欄編輯 |
+| 世界事件系統 | **定期選舉**（公告→競選→全鎮投票→開票→反應）、節慶市集、派對、八卦傳播、自訂事件——用遊戲內時間排程、可循環發生，`/events/` 頁面一鍵排程並查看開票結果 |
 
 ## 快速開始
 
@@ -143,6 +144,41 @@ python reverie.py
 
 另外 `/settings/` 頁面現在也包含「Performance & cost」區塊——**成本上限、快取開關、平行開關、自動存檔頻率**都能在網頁上設定，不必再碰環境變數。
 
+## 世界事件系統：選舉、節慶、八卦
+
+原版其實**沒有**任何自動發生的事件——論文裡的情人節派對和 Sam 參選鎮長，都是研究者手動植入記憶引發的。這個 fork 加入了完整的事件引擎，事件按**遊戲內時間**排程、可設定循環，存在模擬資料裡（存檔/fork 都會保留）。
+
+### 選舉（核心事件）
+完整的三階段機制：
+
+1. **公告**：全鎮每個居民得知「選舉要來了、候選人是誰」（候選人自己則得知「你要參選、要拉票」）——之後競選期間的討論、拉票、表態全部是 agent 自發湧現的
+2. **投票日**：每個居民被逐一「訪談」，根據**自己的記憶、人際關係和個性**投下一票（LLM 依據該 agent 檢索到的相關記憶做決定，平行執行）
+3. **開票**：自動計票，結果個人化地傳回每個居民的記憶（贏家慶祝、輸家不甘、選民對結果有感受）——引發下一輪討論與反應
+
+支援**定期選舉**（例如每 7 個遊戲日一輪），候選人可指定或每輪隨機抽兩位。
+
+**網頁操作**：開 [http://localhost:8000/events/](http://localhost:8000/events/)，按「🗳️ Recurring election (every 7 days)」預設按鈕 → Schedule event 即可。開票結果（含每個人投給誰、理由是什麼）都在同頁展開查看。
+
+**命令列操作**（模擬伺服器提示符）：
+
+```
+election start 2: Sam Moore; Tom Moreno   # 一次性選舉，2 個遊戲日後投票
+election auto 7 2: random                 # 每 7 日一輪，競選期 2 日，隨機抽候選人
+election vote now                         # 強制下一步就開票（展示用）
+election off                              # 取消所有選舉
+event list                                # 查看所有排程事件
+```
+
+### 其他內建事件（廣播型）
+`/events/` 頁面有一鍵預設：
+
+| 事件 | 效果 |
+|---|---|
+| 🧺 週末市集 | 每 7 遊戲日全鎮收到「今天廣場有市集」，居民會想去逛、在那裡社交 |
+| 🎉 派對 | 一次性「今晚 Hobbs Cafe 有派對，你被邀請了」，觀察誰赴約、誰揪誰 |
+| 🤫 八卦 | 只告訴隨機 3 個人一條流言（「聽說有人中了樂透還瞞著大家」），觀察流言如何傳播變形 |
+| 自訂 | 任何文字、任何對象（全鎮 / 隨機 K 人 / 指定名單）、任何時間、可循環 |
+
 ## 成本上限保護
 
 怕掛機跑出天價帳單？設定預算上限（美元）：
@@ -225,6 +261,7 @@ This fork modernizes the original codebase so it runs today:
 * **Web-based provider settings** — visit `/settings` on the environment server to pick a provider preset (OpenAI, DeepSeek, MiniMax, Gemini, Ollama, or any OpenAI-compatible endpoint) and enter API keys in the browser; saved to a git-ignored `llm_config.json` that overrides environment variables.
 * **Web intervention panel** — `/intervene/` lets you whisper a thought into any agent's mind from the browser while the simulation runs.
 * **Scenario generator + web editor** — `python scenario_generator.py --name <sim> --story "<premise in any language>"` rewrites every persona's identity and relationships to fit a story premise and produces a loadable whisper CSV; the `/scenario/` page does the same from the browser, with per-field editing of every persona. The `/settings` page also exposes the cost limit, cache, parallelism, and checkpoint knobs.
+* **World events** — a game-clock event engine with recurring **mayoral elections** (announce → emergent campaigning → every agent votes individually based on its own memories → personalized results trigger reactions), plus broadcast events (festivals, parties, rumors to random subsets, custom whispers), schedulable from the `/events/` page or `election ...` CLI commands; election history with per-agent votes and reasons is browsable on the page.
 * **Cost ceiling** — set `COST_LIMIT_USD` to auto-save and halt the simulation when the estimated spend reaches your budget (warning at 80%).
 * **Docker deployment** — `docker compose up -d` for the web server and `docker compose run --rm backend` for the interactive simulation; state persists via bind mounts.
 

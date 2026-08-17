@@ -348,7 +348,7 @@ def _json_safe_generate_response(request_model,
   prompt += "Example output json:\n"
   prompt += '{"output": "' + str(example_output) + '"}'
 
-  if verbose:
+  if verbose and globals().get("debug", False):
     print("CHAT GPT PROMPT")
     print(prompt)
 
@@ -409,7 +409,7 @@ def ChatGPT_safe_generate_response_OLD(prompt,
                                        func_validate=None,
                                        func_clean_up=None,
                                        verbose=False):
-  if verbose:
+  if verbose and globals().get("debug", False):
     print("CHAT GPT PROMPT")
     print(prompt)
 
@@ -496,7 +496,7 @@ def safe_generate_response(prompt,
                            func_validate=None,
                            func_clean_up=None,
                            verbose=False):
-  if verbose:
+  if verbose and globals().get("debug", False):
     print(prompt)
 
   for i in range(repeat):

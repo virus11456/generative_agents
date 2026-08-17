@@ -585,11 +585,19 @@ def _determine_action(persona, maze):
         return False
     return True
 
-  # The goal of this function is to get us the action associated with 
-  # <curr_index>. As a part of this, we may need to decompose some large 
-  # chunk actions. 
+  # The goal of this function is to get us the action associated with
+  # <curr_index>. As a part of this, we may need to decompose some large
+  # chunk actions.
   # Importantly, we try to decompose at least two hours worth of schedule at
-  # any given point. 
+  # any given point.
+  # Guard: an empty schedule (LLM planning fail-safes, or a persona saved
+  # mid-crash) would crash every index below -- pad with an idle hour so
+  # the persona coasts instead of killing the simulation.
+  if not persona.scratch.f_daily_schedule:
+    persona.scratch.f_daily_schedule = [["idle", 60]]
+    if not persona.scratch.f_daily_schedule_hourly_org:
+      persona.scratch.f_daily_schedule_hourly_org = [["idle", 60]]
+
   curr_index = persona.scratch.get_f_daily_schedule_index()
   curr_index_60 = persona.scratch.get_f_daily_schedule_index(advance=60)
 
@@ -629,27 +637,28 @@ def _determine_action(persona, maze):
   # Generate an <Action> instance from the action description and duration. By
   # this point, we assume that all the relevant actions are decomposed and 
   # ready in f_daily_schedule. 
-  print ("DEBUG LJSDLFSKJF")
-  for i in persona.scratch.f_daily_schedule: print (i)
-  print (curr_index)
-  print (len(persona.scratch.f_daily_schedule))
-  print (persona.scratch.name)
-  print ("------")
+  if debug:
+    print ("DEBUG LJSDLFSKJF")
+    for i in persona.scratch.f_daily_schedule: print (i)
+    print (curr_index)
+    print (len(persona.scratch.f_daily_schedule))
+    print (persona.scratch.name)
+    print ("------")
 
-  # 1440
+  # If the schedule does not cover the full 1440-minute day, pad the
+  # remainder with sleep (only when there is a positive remainder -- the
+  # original unconditionally appended, corrupting index math with
+  # zero/negative durations).
   x_emergency = 0
-  for i in persona.scratch.f_daily_schedule: 
+  for i in persona.scratch.f_daily_schedule:
     x_emergency += i[1]
-  # print ("x_emergency", x_emergency)
+  if 1440 - x_emergency > 0:
+    persona.scratch.f_daily_schedule += [["sleeping", 1440 - x_emergency]]
 
-  if 1440 - x_emergency > 0: 
-    print ("x_emergency__AAA", x_emergency)
-  persona.scratch.f_daily_schedule += [["sleeping", 1440 - x_emergency]]
-  
-
-
-
-  act_desp, act_dura = persona.scratch.f_daily_schedule[curr_index] 
+  # Clamp: elapsed time can outrun a short schedule; act on the last block
+  # rather than crashing.
+  curr_index = min(curr_index, len(persona.scratch.f_daily_schedule) - 1)
+  act_desp, act_dura = persona.scratch.f_daily_schedule[curr_index]
 
 
 
@@ -1009,8 +1018,13 @@ def plan(persona, maze, personas, new_day, retrieved):
   OUTPUT 
     The target action address of the persona (persona.scratch.act_address).
   """ 
-  # PART 1: Generate the hourly schedule. 
-  if new_day: 
+  # PART 1: Generate the hourly schedule.
+  # A persona saved mid-crash can carry a curr_time but an empty schedule
+  # (its day was never planned); treat that like the start of a day so the
+  # plan is (re)generated instead of crashing downstream.
+  if not new_day and not persona.scratch.f_daily_schedule:
+    new_day = "First day" if not persona.scratch.daily_req else "New day"
+  if new_day:
     _long_term_planning(persona, new_day)
 
   # PART 2: If the current action has expired, we want to create a new plan.

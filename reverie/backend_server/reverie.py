@@ -1002,7 +1002,27 @@ class ReverieServer:
         pass
 
 
+def resolve_autorun_sims(origin, target, storage_dir):
+  """
+  Restart-safe sim naming for autorun: if <target> already exists (the
+  container restarted or was updated), resume from the newest run in the
+  lineage (<target>, <target>-r2, <target>-r3, ...) by forking it into the
+  next free -rN name, instead of crashing on the existing folder.
+  """
+  if not os.path.isdir(f"{storage_dir}/{target}"):
+    return origin, target
+  n = 2
+  latest = target
+  while os.path.isdir(f"{storage_dir}/{target}-r{n}"):
+    latest = f"{target}-r{n}"
+    n += 1
+  return latest, f"{target}-r{n}"
+
+
 if __name__ == '__main__':
+  import signal
+  import sys
+
   # Non-interactive mode for 24/7 operation (e.g. `docker compose up -d
   # autorun`): set REVERIE_FORK_SIM and REVERIE_NEW_SIM, and optionally
   # REVERIE_AUTORUN to a step count or "forever". Autorun implies headless.
@@ -1013,6 +1033,20 @@ if __name__ == '__main__':
   if not (origin and target):
     origin = input("Enter the name of the forked simulation: ").strip()
     target = input("Enter the name of the new simulation: ").strip()
+
+  if autorun:
+    # Restarts (redeploys, crashes, `docker compose restart`) resume the
+    # lineage instead of failing on the existing sim folder.
+    resolved_origin, resolved_target = resolve_autorun_sims(
+      origin, target, fs_storage)
+    if (resolved_origin, resolved_target) != (origin, target):
+      print (f"Autorun: '{target}' exists -- resuming from "
+             f"'{resolved_origin}' as '{resolved_target}'.")
+    origin, target = resolved_origin, resolved_target
+
+    # A stopping container sends SIGTERM; convert it to a normal exit so
+    # the finally-save below runs and no progress is lost.
+    signal.signal(signal.SIGTERM, lambda signum, frame: sys.exit(0))
 
   rs = ReverieServer(origin, target)
 

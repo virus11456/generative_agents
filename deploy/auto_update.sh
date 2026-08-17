@@ -1,0 +1,32 @@
+#!/bin/bash
+# Auto-update: pull the latest main branch and restart the Docker services
+# whenever new commits land on GitHub. Progress is safe: the simulation
+# auto-checkpoints and saves again on SIGTERM, and autorun resumes its
+# lineage (my_town -> my_town-r2 -> ...) after every restart.
+#
+# Install once (checks every 5 minutes, logs to ~/auto_update.log):
+#
+#   chmod +x deploy/auto_update.sh
+#   (crontab -l 2>/dev/null; echo "*/5 * * * * $HOME/generative_agents/deploy/auto_update.sh >> $HOME/auto_update.log 2>&1") | crontab -
+#
+set -e
+cd "$(dirname "$0")/.."
+
+git fetch origin main -q
+LOCAL=$(git rev-parse HEAD)
+REMOTE=$(git rev-parse origin/main)
+if [ "$LOCAL" = "$REMOTE" ]; then
+  exit 0
+fi
+
+echo "$(date '+%F %T') updating ${LOCAL:0:8} -> ${REMOTE:0:8}"
+git pull -q origin main
+
+# Restart with the autorun profile only if the autorun town is running.
+PROFILE=""
+if docker ps --format '{{.Names}}' | grep -q "autorun"; then
+  PROFILE="--profile autorun"
+fi
+
+docker compose $PROFILE up -d --build --force-recreate
+echo "$(date '+%F %T') update complete"

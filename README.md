@@ -228,6 +228,19 @@ docker compose up -d                       # 網頁伺服器（觀看用）
 ```
 `autorun` 服務會自動 fork 種子模擬、headless 連續運行、每 50 步自動存檔、到成本上限自動停止存檔。也可用環境變數 `REVERIE_FORK_SIM` / `REVERIE_NEW_SIM` / `REVERIE_AUTORUN`（步數或 `forever`）自訂。
 
+**重啟安全**：容器停止時（更新、重開機、`docker compose restart`）會收到 SIGTERM 並優雅存檔；再次啟動時自動從最新進度續跑，模擬名稱依序遞增（`my_town` → `my_town-r2` → `my_town-r3`…），不會因資料夾已存在而失敗。
+
+### GitHub 更新後自動部署
+在 VPS 上執行一次以下指令，之後每次 GitHub 的 `main` 有新 commit，VPS 會在 5 分鐘內自動拉取並重啟服務（模擬進度不丟、自動續跑）：
+
+```bash
+cd ~/generative_agents
+chmod +x deploy/auto_update.sh
+(crontab -l 2>/dev/null; echo "*/5 * * * * $HOME/generative_agents/deploy/auto_update.sh >> $HOME/auto_update.log 2>&1") | crontab -
+```
+
+查看更新紀錄：`cat ~/auto_update.log`。停用：`crontab -e` 刪掉那一行。
+
 ### 小鎮日報《The Ville Chronicle》
 每個遊戲日結束時，後端自動把當天**每個居民的行動軌跡和所有對話逐字稿**（外加選舉結果）交給 LLM，寫成一份報紙——頭條、鎮民動態、居民日誌——存進模擬資料夾。
 

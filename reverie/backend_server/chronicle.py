@@ -104,6 +104,27 @@ def collect_day_log(sim_folder, start_step, end_step):
   except (OSError, ValueError):
     pass
 
+  # Economy activity on this date (trades and notable purchases).
+  try:
+    with open(f"{sim_folder}/reverie/economy.json") as f:
+      economy = json.load(f)
+    econ_lines = []
+    for transaction in economy.get("transactions", []):
+      if (transaction.get("at", "").startswith(date_str)
+          and transaction.get("type") in ("trade", "purchase")):
+        econ_lines += [f"{transaction['from']} -> {transaction['to']}: "
+                       f"${transaction['amount']} ({transaction['note']})"]
+    if econ_lines:
+      lines += ["", "== ECONOMY (money that changed hands) =="]
+      lines += econ_lines[:60]
+    balances = economy.get("balances", {})
+    if balances:
+      ranked = sorted(balances.items(), key=lambda kv: -kv[1])
+      lines += ["", "== WALLETS (end of day) =="]
+      lines += [f"{name}: ${balance:g}" for name, balance in ranked]
+  except (OSError, ValueError):
+    pass
+
   digest = "\n".join(lines)
   if len(digest) > _MAX_DIGEST_CHARS:
     digest = digest[:_MAX_DIGEST_CHARS] + "\n(...log truncated)"

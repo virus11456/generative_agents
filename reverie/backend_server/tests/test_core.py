@@ -467,5 +467,195 @@ class TestHeadlessEnvironment(unittest.TestCase):
     shutil.rmtree(sim_folder, ignore_errors=True)
 
 
+class TestTraits(unittest.TestCase):
+  def setUp(self):
+    import traits
+    self.traits = traits
+    self.library = traits.load_trait_library()
+
+  def test_library_size_and_integrity(self):
+    ids = [t["id"] for t in self.library]
+    self.assertEqual(len(self.library), 100)
+    self.assertEqual(len(ids), len(set(ids)))
+    for t in self.library:
+      self.assertIn(t["polarity"], ("positive", "negative", "quirk"))
+      self.assertTrue(t["behavior"])
+      for c in t["conflicts"]:
+        self.assertIn(c, ids)
+
+  def test_draw_respects_counts_and_conflicts(self):
+    import random as random_module
+    rng = random_module.Random(42)
+    by_id = {t["id"]: t for t in self.library}
+    for _ in range(50):
+      hand = self.traits.draw_traits(self.library, rng=rng)
+      self.assertEqual(len(hand), 4)  # 2 positive + 1 negative + 1 quirk
+      ids = [t["id"] for t in hand]
+      self.assertEqual(len(ids), len(set(ids)))
+      for t in hand:
+        for c in t["conflicts"]:
+          self.assertNotIn(c, ids,
+                           f"conflicting pair drawn: {t['id']} + {c}")
+      polarities = [t["polarity"] for t in hand]
+      self.assertEqual(polarities.count("positive"), 2)
+      self.assertEqual(polarities.count("negative"), 1)
+
+  def test_relationships_rules(self):
+    import random as random_module
+    rng = random_module.Random(7)
+    names = ["Ana Lin", "Bo Lin", "Cy Park", "Di Park", "Ed Moore",
+             "Fay Chen", "Gil Ortiz", "Hana Sato", "Ivo Reyes",
+             "Joy Walsh", "Kai Doyle", "Lia Marsh"]
+    relationships = self.traits.generate_relationships(names, rng=rng)
+    partnered = []
+    pairs = set()
+    for r in relationships:
+      self.assertIn(r["type"], self.traits.REL_TYPES)
+      pair = frozenset((r["a"], r["b"]))
+      self.assertNotIn(pair, pairs, "pair holds two relationships")
+      pairs.add(pair)
+      same_surname = (r["a"].split()[-1] == r["b"].split()[-1])
+      if r["type"] in ("partner", "crush"):
+        self.assertFalse(same_surname, "romance within a family")
+      if r["type"] == "sibling":
+        self.assertTrue(same_surname)
+      if r["type"] == "partner":
+        partnered += [r["a"], r["b"]]
+    self.assertEqual(len(partnered), len(set(partnered)),
+                     "someone has two partners")
+
+  def test_crush_whisper_is_one_way(self):
+    whispers = self.traits.relationship_whispers(
+      {"type": "crush", "a": "Ana", "b": "Bo"})
+    self.assertEqual(len(whispers), 1)
+    self.assertEqual(whispers[0][0], "Ana")
+    self.assertIn("secret crush on Bo", whispers[0][1])
+
+  def test_assign_to_sim_and_idempotence(self):
+    import random as random_module
+    import events
+    sim_folder = tempfile.mkdtemp(prefix="tr_sim_")
+    os.makedirs(f"{sim_folder}/reverie", exist_ok=True)
+    for name in ["Kim Tester", "Lee Tester", "Mo Vance"]:
+      d = f"{sim_folder}/personas/{name}/bootstrap_memory"
+      os.makedirs(d, exist_ok=True)
+      with open(f"{d}/scratch.json", "w") as f:
+        json.dump({"name": name, "innate": "kind"}, f)
+    with open(f"{sim_folder}/reverie/meta.json", "w") as f:
+      json.dump({"persona_names": ["Kim Tester", "Lee Tester",
+                                   "Mo Vance"]}, f)
+
+    manager = events.EventManager(sim_folder,
+                                  whisper_fn=lambda *a: None)
+    registry, relationships = self.traits.assign_to_sim(
+      sim_folder, manager, rng=random_module.Random(3))
+    self.assertEqual(len(registry), 3)
+    scratch = json.load(open(f"{sim_folder}/personas/Kim Tester/"
+                             f"bootstrap_memory/scratch.json"))
+    self.assertTrue(scratch["innate"].startswith("kind, "))
+    self.assertEqual(len(scratch["innate"].split(",")), 1 + 4)
+    # one seed-whisper broadcast event queued per persona
+    seed_events = [e for e in manager.events
+                   if e["label"].startswith("persona seed")]
+    self.assertEqual(len(seed_events), 3)
+    # second call is a no-op (registry already exists)
+    registry2, _ = self.traits.assign_to_sim(sim_folder, manager)
+    self.assertEqual(registry, registry2)
+    self.assertEqual(len([e for e in manager.events
+                          if e["label"].startswith("persona seed")]), 3)
+    import shutil
+    shutil.rmtree(sim_folder, ignore_errors=True)
+
+
+class TestEconomy(unittest.TestCase):
+  def setUp(self):
+    import datetime
+    from economy import EconomyManager
+    self.sim_folder = tempfile.mkdtemp(prefix="eco_sim_")
+    os.makedirs(f"{self.sim_folder}/reverie", exist_ok=True)
+    self.now = datetime.datetime(2023, 2, 13, 12, 0, 0)
+    self.whispers = []
+    self.trade_responses = []
+    self.manager = EconomyManager(
+      self.sim_folder,
+      whisper_fn=lambda personas, name, text:
+        self.whispers.append((name, text)),
+      trade_llm_fn=lambda prompt, cache_read:
+        self.trade_responses.pop(0))
+    self.personas = {"Ana": object(), "Bo": object()}
+
+  def tearDown(self):
+    import shutil
+    shutil.rmtree(self.sim_folder, ignore_errors=True)
+
+  def _mv(self, desc, chat=None):
+    return {"movement": [0, 0], "pronunciatio": "", "description": desc,
+            "chat": chat}
+
+  def test_venue_charge_on_consumption_only(self):
+    movements = {
+      "Ana": self._mv("drinking coffee @ the Ville:Hobbs Cafe:cafe"),
+      "Bo": self._mv("working at the counter @ the Ville:Hobbs Cafe:cafe")}
+    self.manager.on_step(self.personas, movements, self.now)
+    self.assertEqual(self.manager.balances["Ana"], 92.0)   # -8 coffee
+    self.assertEqual(self.manager.balances["Bo"], 100.0)   # working: free
+
+  def test_same_action_charged_once(self):
+    movements = {
+      "Ana": self._mv("eating lunch @ the Ville:Hobbs Cafe:cafe")}
+    self.manager.on_step(self.personas, movements, self.now)
+    self.manager.on_step(self.personas, movements, self.now)
+    self.assertEqual(self.manager.balances["Ana"], 92.0)
+
+  def test_daily_wage_once_per_day(self):
+    self.manager.on_new_day(self.now, self.personas)
+    self.manager.on_new_day(self.now, self.personas)
+    self.assertEqual(self.manager.balances["Ana"], 180.0)
+
+  def test_trade_applied_and_whispered(self):
+    self.trade_responses = [json.dumps(
+      {"trade": True, "payer": "Ana", "payee": "Bo", "amount": 20,
+       "note": "Ana lent Bo twenty"})]
+    chat = [["Ana", "Here, take $20 until payday."],
+            ["Bo", "Thanks, I'll pay you back!"]]
+    movements = {"Ana": self._mv("chatting", chat)}
+    self.manager.on_step(self.personas, movements, self.now,
+                         {"Ana": ["generous"], "Bo": ["freeloading"]})
+    self.assertEqual(self.manager.balances["Ana"], 80.0)
+    self.assertEqual(self.manager.balances["Bo"], 120.0)
+    self.assertEqual(len([w for w in self.whispers if w[0] == "Ana"]), 1)
+
+  def test_same_chat_evaluated_once(self):
+    self.trade_responses = [json.dumps({"trade": False}),
+                            json.dumps({"trade": True, "payer": "Ana",
+                                        "payee": "Bo", "amount": 5,
+                                        "note": "x"})]
+    chat = [["Ana", "hello"], ["Bo", "hi"]]
+    movements = {"Ana": self._mv("chatting", chat)}
+    self.manager.on_step(self.personas, movements, self.now)
+    self.manager.on_step(self.personas, movements, self.now)
+    self.assertEqual(len(self.trade_responses), 1)  # second never consumed
+    self.assertEqual(self.manager.balances["Ana"], 100.0)
+
+  def test_poverty_whisper_fires_once(self):
+    self.manager.balances = {"Ana": 5.0, "Bo": 100.0}
+    self.manager.on_step(self.personas, {}, self.now)
+    self.manager.on_step(self.personas, {}, self.now)
+    poverty = [w for w in self.whispers if "low on money" in w[1]]
+    self.assertEqual(len(poverty), 1)
+    self.assertEqual(poverty[0][0], "Ana")
+
+  def test_persistence_roundtrip(self):
+    from economy import EconomyManager
+    self.manager.balances = {"Ana": 55.5}
+    self.manager._log(self.now, "trade", "Ana", "Bo", 5, "test")
+    self.manager.save()
+    reloaded = EconomyManager(self.sim_folder,
+                              whisper_fn=lambda *a: None,
+                              trade_llm_fn=lambda *a: "{}")
+    self.assertEqual(reloaded.balances["Ana"], 55.5)
+    self.assertEqual(len(reloaded.transactions), 1)
+
+
 if __name__ == "__main__":
   unittest.main()

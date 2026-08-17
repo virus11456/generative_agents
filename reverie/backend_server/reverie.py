@@ -36,7 +36,9 @@ from maze import *
 from persona.persona import *
 from persona.cognitive_modules.plan import apply_pending_reactions
 from events import EventManager
+from economy import EconomyManager
 import chronicle
+import traits as traits_module
 from persona.prompt_template.gpt_structure import (format_llm_stats,
                                                    get_llm_stats,
                                                    save_llm_stats)
@@ -51,6 +53,10 @@ HEADLESS_MODE = globals().get("headless_mode", False)
 CHRONICLE_ENABLED = globals().get("chronicle_enabled", True)
 CHRONICLE_LANG = globals().get("chronicle_lang",
                                "Traditional Chinese (繁體中文)")
+TRAITS_AUTO = globals().get("traits_auto", True)
+ECONOMY_ENABLED = globals().get("economy_enabled", True)
+ECON_STARTING_BALANCE = globals().get("econ_starting_balance", 100.0)
+ECON_DAILY_WAGE = globals().get("econ_daily_wage", 80.0)
 
 
 def write_headless_environment(sim_folder, step, movements):
@@ -174,6 +180,26 @@ class ReverieServer:
     # World-event engine (elections, festivals, rumors, custom broadcasts).
     # Events persist in <sim_folder>/reverie/events.json across save/fork.
     self.events = EventManager(sim_folder, fs_temp_storage)
+
+    # Personality traits + relationship web: drawn once per simulation
+    # lineage (skipped when the forked sim already carries a registry).
+    if TRAITS_AUTO:
+      try:
+        had_registry = bool(traits_module.load_registry(sim_folder))
+        traits_module.assign_to_sim(sim_folder, self.events)
+        if not had_registry:
+          print ("[traits] drew personality traits and relationships for "
+                 "this town -- type 'traits show' to inspect them.")
+      except Exception:
+        traceback.print_exc()
+
+    # Economy: wallets, wages, venue spending, conversation trades.
+    self.economy = None
+    if ECONOMY_ENABLED:
+      self.economy = EconomyManager(
+        sim_folder, starting_balance=ECON_STARTING_BALANCE,
+        daily_wage=ECON_DAILY_WAGE)
+      self.economy.ensure_personas(self.personas.keys())
 
     # Headless mode (no browser needed) and the daily chronicle.
     self.headless = HEADLESS_MODE
@@ -533,8 +559,18 @@ class ReverieServer:
           #  "persona": {"Klaus Mueller": {"movement": [38, 12]}}, 
           #  "meta": {curr_time: <datetime>}}
           curr_move_file = f"{sim_folder}/movement/{self.step}.json"
-          with open(curr_move_file, "w") as outfile: 
+          with open(curr_move_file, "w") as outfile:
             outfile.write(json.dumps(movements, indent=2))
+
+          # Economy bookkeeping: venue spending, conversation trades,
+          # poverty whispers.
+          if self.economy:
+            try:
+              self.economy.on_step(
+                self.personas, movements["persona"], self.curr_time,
+                traits_module.load_registry(sim_folder))
+            except Exception:
+              traceback.print_exc()
 
           # After this cycle, the world takes one step forward, and the
           # current time moves by <sec_per_step> amount.
@@ -548,6 +584,13 @@ class ReverieServer:
             write_headless_environment(sim_folder, self.step, movements)
             with open(f"{fs_temp_storage}/curr_step.json", "w") as outfile:
               outfile.write(json.dumps({"step": self.step}, indent=2))
+
+          # A game day just started: pay everyone's daily wage.
+          if self.economy and self.curr_time.date() != prev_date:
+            try:
+              self.economy.on_new_day(self.curr_time, self.personas)
+            except Exception:
+              traceback.print_exc()
 
           # A game day just ended: write today's issue of the chronicle.
           if CHRONICLE_ENABLED and self.curr_time.date() != prev_date:
@@ -759,6 +802,9 @@ class ReverieServer:
             "planning a party tonight\n"
             "  interview <persona>             -- chat with a persona (does not alter "
             "its memory)\n"
+            "  traits show                     -- personas' personality traits & relationships\n"
+            "  traits assign                   -- draw traits for a sim that has none\n"
+            "  economy                         -- balances and recent transactions\n"
             "  event list                      -- show scheduled world events\n"
             "  event remove <id>               -- cancel a scheduled event\n"
             "  election start <days>: <A>; <B> -- one-shot election, vote in <days> game days\n"
@@ -795,6 +841,25 @@ class ReverieServer:
             load_history_via_whisper(self.personas,
                                      [[persona_name, whisper]])
             ret_str += f"Whispered to {persona_name}: {whisper}"
+
+        elif sim_command.lower() == "traits show":
+          # Show every persona's drawn traits and the relationship web.
+          ret_str += traits_module.format_registry(sim_folder)
+
+        elif sim_command.lower() == "traits assign":
+          # Draw traits/relationships if this sim doesn't have them yet.
+          had_registry = bool(traits_module.load_registry(sim_folder))
+          traits_module.assign_to_sim(sim_folder, self.events)
+          ret_str += ("This simulation already has traits assigned."
+                      if had_registry else
+                      "Traits and relationships assigned -- they will be "
+                      "whispered into memories on the next step.\n"
+                      + traits_module.format_registry(sim_folder))
+
+        elif sim_command.lower() == "economy":
+          # Show balances and recent transactions.
+          ret_str += (self.economy.summary_str() if self.economy
+                      else "Economy is disabled (ECONOMY=0).")
 
         elif sim_command.lower() == "event list":
           # Show all scheduled world events.

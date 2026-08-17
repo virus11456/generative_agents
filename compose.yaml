@@ -36,9 +36,41 @@ services:
       - COST_LIMIT_USD=${COST_LIMIT_USD:-0}
       - PARALLEL_PERSONAS=${PARALLEL_PERSONAS:-1}
       - CHECKPOINT_FREQ=${CHECKPOINT_FREQ:-50}
+      - HEADLESS=${HEADLESS:-0}
+      - CHRONICLE=${CHRONICLE:-1}
+      - CHRONICLE_LANG=${CHRONICLE_LANG:-}
     stdin_open: true
     tty: true
     # Not started by `docker compose up` -- run interactively instead:
     #   docker compose run --rm backend
     profiles:
       - backend
+
+  # 24/7 unattended town: set REVERIE_FORK_SIM/REVERIE_NEW_SIM in .env, then
+  #   docker compose --profile autorun up -d
+  # The world advances headless (no browser needed); watch at
+  # /simulator_home and read the daily paper at /chronicle/.
+  # Set COST_LIMIT_USD as a safety fuse!
+  autorun:
+    build: .
+    working_dir: /app/reverie/backend_server
+    command: python reverie.py
+    volumes:
+      - .:/app
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-}
+      - OPENAI_CHAT_MODEL=${OPENAI_CHAT_MODEL:-gpt-4o-mini}
+      - OPENAI_EMBEDDING_MODEL=${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      - EMBEDDING_API_KEY=${EMBEDDING_API_KEY:-}
+      - EMBEDDING_BASE_URL=${EMBEDDING_BASE_URL:-}
+      - COST_LIMIT_USD=${COST_LIMIT_USD:-5}
+      - CHECKPOINT_FREQ=${CHECKPOINT_FREQ:-50}
+      - CHRONICLE=${CHRONICLE:-1}
+      - CHRONICLE_LANG=${CHRONICLE_LANG:-}
+      - REVERIE_FORK_SIM=${REVERIE_FORK_SIM:-base_the_ville_isabella_maria_klaus}
+      - REVERIE_NEW_SIM=${REVERIE_NEW_SIM:-town_24_7}
+      - REVERIE_AUTORUN=${REVERIE_AUTORUN:-forever}
+    restart: "no"
+    profiles:
+      - autorun

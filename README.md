@@ -31,6 +31,8 @@ This repository accompanies our research paper titled "[Generative Agents: Inter
 | 成本上限保護 | 設 `COST_LIMIT_USD` 預算上限，花費達 80% 警告、達 100% 自動存檔停止，防止掛機跑出天價帳單 |
 | 劇本產生器 + 網頁編輯器 | 一句話的故事設定（中英文皆可）→ 自動生成所有角色的人設、目標、人際關係；`/scenario/` 頁面可直接在瀏覽器生成與逐欄編輯 |
 | 世界事件系統 | **定期選舉**（公告→競選→全鎮投票→開票→反應）、節慶市集、派對、八卦傳播、自訂事件——用遊戲內時間排程、可循環發生，`/events/` 頁面一鍵排程並查看開票結果 |
+| 24/7 掛機模式 | Headless 無頭運行——不需要開瀏覽器，小鎮在 VPS 上自己過日子；你隨時打開 `simulator_home` 就能看到他們正在生活 |
+| 小鎮日報 | 每個遊戲日結束自動把當天所有行動與對話寫成一份**中文報紙**，`/chronicle/` 頁面閱讀——離開幾天回來，從日報補劇情 |
 
 ## 快速開始
 
@@ -179,6 +181,38 @@ event list                                # 查看所有排程事件
 | 🤫 八卦 | 只告訴隨機 3 個人一條流言（「聽說有人中了樂透還瞞著大家」），觀察流言如何傳播變形 |
 | 自訂 | 任何文字、任何對象（全鎮 / 隨機 K 人 / 指定名單）、任何時間、可循環 |
 
+## 24/7 掛機模式與小鎮日報
+
+**重要觀念**：小鎮的時間不會自己流動——只有你下 `run` 指令、且（原版設計裡）瀏覽器分頁開著，世界才會前進。這兩個功能合起來，讓小鎮變成一個「你不觀測也持續生活」的世界：
+
+### Headless 無頭模式
+後端自己扮演瀏覽器的角色推進世界，不需要任何分頁開著：
+
+```
+Enter option: headless on
+Enter option: run forever
+```
+
+（或在 `/settings/` 的「24/7 & chronicle」區塊開啟，或設環境變數 `HEADLESS=1`。）之後**隨時**打開 `http://<主機>:8000/simulator_home`，都能從當下的時間點看到居民正在活動；關掉分頁小鎮照樣運轉。
+
+### Docker 一鍵 24/7 小鎮
+```bash
+# .env 設定 OPENAI_API_KEY 和 COST_LIMIT_USD（保險絲！），然後：
+docker compose --profile autorun up -d     # 小鎮開始自己過日子
+docker compose up -d                       # 網頁伺服器（觀看用）
+```
+`autorun` 服務會自動 fork 種子模擬、headless 連續運行、每 50 步自動存檔、到成本上限自動停止存檔。也可用環境變數 `REVERIE_FORK_SIM` / `REVERIE_NEW_SIM` / `REVERIE_AUTORUN`（步數或 `forever`）自訂。
+
+### 小鎮日報《The Ville Chronicle》
+每個遊戲日結束時，後端自動把當天**每個居民的行動軌跡和所有對話逐字稿**（外加選舉結果）交給 LLM，寫成一份報紙——頭條、鎮民動態、居民日誌——存進模擬資料夾。
+
+* 閱讀：`http://localhost:8000/chronicle/`（報紙風格頁面，可切換模擬、翻歷史刊號）
+* 語言：預設**繁體中文**（`/settings/` 或 `CHRONICLE_LANG` 可改）
+* 成本：每遊戲日一次 LLM 呼叫，很便宜；不想要可在 `/settings/` 關閉
+* 手動出刊：模擬伺服器輸入 `chronicle now`（總結今天到目前為止）
+
+離開三天回來的流程：打開 `/chronicle/` 從日報看這幾天的劇情 → 對哪天有興趣就開 `/replay/` 重播那天 → 想深挖就 `interview` 當事人或翻他的記憶流。
+
 ## 成本上限保護
 
 怕掛機跑出天價帳單？設定預算上限（美元）：
@@ -262,6 +296,8 @@ This fork modernizes the original codebase so it runs today:
 * **Web intervention panel** — `/intervene/` lets you whisper a thought into any agent's mind from the browser while the simulation runs.
 * **Scenario generator + web editor** — `python scenario_generator.py --name <sim> --story "<premise in any language>"` rewrites every persona's identity and relationships to fit a story premise and produces a loadable whisper CSV; the `/scenario/` page does the same from the browser, with per-field editing of every persona. The `/settings` page also exposes the cost limit, cache, parallelism, and checkpoint knobs.
 * **World events** — a game-clock event engine with recurring **mayoral elections** (announce → emergent campaigning → every agent votes individually based on its own memories → personalized results trigger reactions), plus broadcast events (festivals, parties, rumors to random subsets, custom whispers), schedulable from the `/events/` page or `election ...` CLI commands; election history with per-agent votes and reasons is browsable on the page.
+* **24/7 headless mode** — `headless on` + `run forever` (or `docker compose --profile autorun up -d`) advances the world with no browser attached; open `simulator_home` anytime to watch the town live. `REVERIE_FORK_SIM`/`REVERIE_NEW_SIM`/`REVERIE_AUTORUN` enable fully non-interactive startup.
+* **The Ville Chronicle** — at every game-day boundary the backend compresses the day's full activity log (every action and verbatim conversation, plus election results) and has the LLM write a daily newspaper (language configurable, default Traditional Chinese); browse issues at `/chronicle/`, or force one with `chronicle now`.
 * **Cost ceiling** — set `COST_LIMIT_USD` to auto-save and halt the simulation when the estimated spend reaches your budget (warning at 80%).
 * **Docker deployment** — `docker compose up -d` for the web server and `docker compose run --rm backend` for the interactive simulation; state persists via bind mounts.
 

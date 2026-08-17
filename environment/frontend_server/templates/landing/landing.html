@@ -2,9 +2,11 @@
 {% load static %}
 
 {% block content %}
-<div style="padding:2em">
-<img src="{% static 'img/atlas.png' %}">
-Your environment server is up and running! 
+<div style="max-width: 560px; margin: 4em auto; padding: 2em; text-align: center;
+            font-family: -apple-system, 'Segoe UI', 'Noto Sans TC', Roboto,
+            sans-serif">
+  <img src="{% static 'img/atlas.png' %}" style="max-width: 100%">
+  <h2>環境伺服器運行中！</h2>
+  <p>前往 <a href="/simulator_home">simulator_home</a> 觀看小鎮。</p>
 </div>
 {% endblock content %}
-

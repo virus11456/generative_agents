@@ -224,7 +224,7 @@ def replay_persona_state(request, sim_code, step, persona_name):
   a_mem_chat = []
   a_mem_thought = []
 
-  for count in range(len(associative.keys()), 0, -1): 
+  for count in range(len(associative.keys()), 0, -1):
     node_id = f"node_{str(count)}"
     node_details = associative[node_id]
 
@@ -236,12 +236,46 @@ def replay_persona_state(request, sim_code, step, persona_name):
 
     elif node_details["type"] == "thought":
       a_mem_thought += [node_details]
-  
+
+  # Traditional Chinese display: identity fields, daily goals, and the
+  # schedule are LLM-translated once and cached (translator/zh.py); with
+  # no API key the original English is shown.
+  from translator import zh as zh_translate
+  ident_fields = ["innate", "learned", "currently", "lifestyle",
+                  "act_description", "act_address"]
+  daily_req = scratch.get("daily_req") or []
+  schedule = scratch.get("f_daily_schedule") or []
+  schedule_tasks = []
+  for item in schedule:
+    if isinstance(item, (list, tuple)) and item:
+      schedule_tasks.append(str(item[0]))
+    else:
+      schedule_tasks.append(str(item))
+  to_translate = [str(scratch.get(f) or "") for f in ident_fields]
+  to_translate += [str(x) for x in daily_req]
+  to_translate += schedule_tasks
+  zh_map = zh_translate.translate_map(to_translate)
+
+  scratch = dict(scratch)
+  for field in ident_fields:
+    original = str(scratch.get(field) or "")
+    scratch[field] = zh_map.get(original.strip(), original)
+  daily_req_zh = [zh_map.get(str(x).strip(), str(x)) for x in daily_req]
+  schedule_zh = []
+  for item, task in zip(schedule, schedule_tasks):
+    task_zh = zh_map.get(task.strip(), task)
+    if isinstance(item, (list, tuple)) and len(item) > 1:
+      schedule_zh.append(f"{task_zh}（{item[1]} 分鐘）")
+    else:
+      schedule_zh.append(task_zh)
+
   context = {"sim_code": sim_code,
              "step": step,
-             "persona_name": persona_name, 
-             "persona_name_underscore": persona_name_underscore, 
+             "persona_name": persona_name,
+             "persona_name_underscore": persona_name_underscore,
              "scratch": scratch,
+             "daily_req_zh": daily_req_zh,
+             "schedule_zh": schedule_zh,
              "spatial": spatial,
              "a_mem_event": a_mem_event,
              "a_mem_chat": a_mem_chat,

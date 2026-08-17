@@ -316,6 +316,32 @@ class EconomyPageTests(SimpleTestCase):
       self.client.get("/economy/?token=s3cret").status_code, 200)
 
 
+class ZhTranslateTests(SimpleTestCase):
+  def setUp(self):
+    import tempfile as _tf
+    fd, self.cfg_path = _tf.mkstemp(suffix=".json")
+    os.close(fd)
+    os.remove(self.cfg_path)
+    os.environ["LLM_CONFIG_PATH"] = self.cfg_path
+    self._old_key = os.environ.pop("OPENAI_API_KEY", None)
+
+  def tearDown(self):
+    os.environ.pop("LLM_CONFIG_PATH", None)
+    if self._old_key is not None:
+      os.environ["OPENAI_API_KEY"] = self._old_key
+
+  def test_no_api_key_returns_originals(self):
+    from translator import zh
+    texts = ["sleeping", "wake up at 7:00 am"]
+    self.assertEqual(zh.translate_map(texts),
+                     {t: t for t in texts})
+
+  def test_chinese_input_passes_through_without_llm(self):
+    from translator import zh
+    self.assertEqual(zh.translate_map(["睡覺中", ""]),
+                     {"睡覺中": "睡覺中"})
+
+
 class IntervenePageTests(SimpleTestCase):
   INTERVENTIONS_DIR = "temp_storage/interventions"
 

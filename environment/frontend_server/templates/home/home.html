@@ -96,6 +96,8 @@
     body { padding-top: 5.2em; }
     .ville-residents { grid-template-columns: 1fr; }
     #game-time-content { font-size: 1.05em; }
+    .ville-time-bar { flex-wrap: wrap; gap: .4em; }
+    .ville-zoom-hint { display: none; }
   }
 </style>
 
@@ -109,6 +111,13 @@
   <span class="label">🕐 目前時間</span>
   <span id="game-time-content"></span>
   <span style="flex:1"></span>
+  <span class="label ville-zoom-hint" style="opacity:.7">滾輪縮放・拖曳平移</span>
+  <button type="button" class="ville-btn" onclick="villeZoomBy(1.25)"
+          title="放大">🔍＋</button>
+  <button type="button" class="ville-btn" onclick="villeZoomBy(0.8)"
+          title="縮小">🔍－</button>
+  <button type="button" class="ville-btn" onclick="villeZoomFit()"
+          title="顯示整個小鎮">🗺️ 全鎮</button>
   <span style="{% if mode == 'simulate' %} display:none {% endif %}">
     <button id="play_button" type="button" class="ville-btn"
             style="background:#059669">▶ 播放</button>

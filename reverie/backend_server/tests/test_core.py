@@ -169,6 +169,16 @@ class TestConfigFilePriority(unittest.TestCase):
     self.assertFalse(utils.parallel_personas)
     self.assertEqual(utils.checkpoint_freq, 25)
 
+  def test_empty_env_strings_scrubbed(self):
+    # docker compose passes unset vars as empty strings; the OpenAI SDK
+    # would treat an empty OPENAI_BASE_URL as a real (invalid) base URL.
+    os.environ["OPENAI_BASE_URL"] = ""
+    os.environ["EMBEDDING_BASE_URL"] = ""
+    utils = self._reload_utils()
+    self.assertNotIn("OPENAI_BASE_URL", os.environ)
+    self.assertNotIn("EMBEDDING_BASE_URL", os.environ)
+    self.assertEqual(utils.openai_base_url, "")
+
   def test_performance_knobs_defaults(self):
     os.environ["LLM_CONFIG_PATH"] = os.path.join(_TMP, "missing2.json")
     utils = self._reload_utils()

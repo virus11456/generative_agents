@@ -33,6 +33,17 @@ try:
 except ImportError:
   pass
 
+# docker compose passes unset variables through as EMPTY STRINGS
+# (VAR=${VAR:-}). The OpenAI SDK treats an empty OPENAI_BASE_URL as a real
+# base URL and builds protocol-less request URLs ("UnsupportedProtocol"
+# crash), so scrub empty values before anything reads them.
+for _empty_var in ("OPENAI_BASE_URL", "EMBEDDING_BASE_URL",
+                   "EMBEDDING_API_KEY", "OPENAI_CHAT_MODEL",
+                   "OPENAI_SMART_CHAT_MODEL", "OPENAI_EMBEDDING_MODEL",
+                   "CHRONICLE_LANG"):
+  if os.environ.get(_empty_var) == "":
+    del os.environ[_empty_var]
+
 # A shared llm_config.json (written by the frontend's /settings page) at the
 # repository root overrides environment variables, so keys entered in the web
 # UI win over whatever the process was started with. Restart reverie.py after

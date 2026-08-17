@@ -365,5 +365,84 @@ class TestEventManager(unittest.TestCase):
       os.path.exists(f"{self.temp_storage}/event_command.json"))
 
 
+class TestChronicle(unittest.TestCase):
+  def setUp(self):
+    self.sim_folder = tempfile.mkdtemp(prefix="chr_sim_")
+    os.makedirs(f"{self.sim_folder}/movement", exist_ok=True)
+
+  def tearDown(self):
+    import shutil
+    shutil.rmtree(self.sim_folder, ignore_errors=True)
+
+  def _write_step(self, step, hhmmss, personas):
+    data = {"persona": personas,
+            "meta": {"curr_time": f"February 13, 2023, {hhmmss}"}}
+    with open(f"{self.sim_folder}/movement/{step}.json", "w") as f:
+      json.dump(data, f)
+
+  def test_collect_day_log_dedupes_and_captures_chat(self):
+    import chronicle
+    self._write_step(0, "08:00:00", {
+      "Ana": {"movement": [1, 1], "description": "making coffee @ cafe",
+              "chat": None}})
+    self._write_step(1, "08:00:10", {
+      "Ana": {"movement": [1, 2], "description": "making coffee @ cafe",
+              "chat": [["Ana", "Good morning!"], ["Bo", "Morning, Ana."]]}})
+    self._write_step(2, "08:00:20", {
+      "Ana": {"movement": [1, 3], "description": "serving customers @ cafe",
+              "chat": None}})
+    digest, date_str = chronicle.collect_day_log(self.sim_folder, 0, 2)
+    self.assertEqual(date_str, "February 13, 2023")
+    # consecutive identical actions collapse to one entry
+    self.assertEqual(digest.count("making coffee"), 1)
+    self.assertIn("serving customers", digest)
+    self.assertIn("Ana: Good morning!", digest)
+
+  def test_collect_day_log_empty_range(self):
+    import chronicle
+    digest, date_str = chronicle.collect_day_log(self.sim_folder, 0, 5)
+    self.assertEqual((digest, date_str), ("", ""))
+
+  def test_generate_chronicle_writes_dated_markdown(self):
+    import chronicle
+    self._write_step(0, "09:00:00", {
+      "Ana": {"movement": [1, 1], "description": "jogging @ park",
+              "chat": None}})
+    captured = {}
+    def fake_llm(prompt):
+      captured["prompt"] = prompt
+      return "# 小鎮日報\n今天 Ana 去慢跑了。"
+    path = chronicle.generate_chronicle(self.sim_folder, 0, 0,
+                                        lang="繁體中文", llm_fn=fake_llm)
+    self.assertTrue(path.endswith("2023-02-13.md"))
+    self.assertIn("jogging", captured["prompt"])
+    self.assertIn("繁體中文", captured["prompt"])
+    with open(path) as f:
+      self.assertIn("慢跑", f.read())
+
+  def test_generate_chronicle_none_when_no_logs(self):
+    import chronicle
+    self.assertIsNone(chronicle.generate_chronicle(
+      self.sim_folder, 0, 3, llm_fn=lambda p: "x"))
+
+
+class TestHeadlessEnvironment(unittest.TestCase):
+  def test_write_headless_environment(self):
+    import reverie
+    sim_folder = tempfile.mkdtemp(prefix="hl_sim_")
+    os.makedirs(f"{sim_folder}/environment", exist_ok=True)
+    movements = {"persona": {
+      "Ana": {"movement": [10, 20], "pronunciatio": "x",
+              "description": "d", "chat": None},
+      "Bo": {"movement": [3, 4], "pronunciatio": "y",
+             "description": "d", "chat": None}}}
+    reverie.write_headless_environment(sim_folder, 7, movements)
+    env = json.load(open(f"{sim_folder}/environment/7.json"))
+    self.assertEqual(env["Ana"], {"maze": "the_ville", "x": 10, "y": 20})
+    self.assertEqual(env["Bo"]["x"], 3)
+    import shutil
+    shutil.rmtree(sim_folder, ignore_errors=True)
+
+
 if __name__ == "__main__":
   unittest.main()

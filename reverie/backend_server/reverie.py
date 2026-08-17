@@ -34,6 +34,7 @@ from utils import *
 from maze import *
 from persona.persona import *
 from events import EventManager
+import chronicle
 from persona.prompt_template.gpt_structure import (format_llm_stats,
                                                    get_llm_stats,
                                                    save_llm_stats)
@@ -44,6 +45,24 @@ PARALLEL_PERSONAS = globals().get("parallel_personas", True)
 MAX_PARALLEL_WORKERS = globals().get("max_parallel_workers", 8)
 CHECKPOINT_FREQ = globals().get("checkpoint_freq", 50)
 COST_LIMIT_USD = globals().get("cost_limit_usd", 0)
+HEADLESS_MODE = globals().get("headless_mode", False)
+CHRONICLE_ENABLED = globals().get("chronicle_enabled", True)
+CHRONICLE_LANG = globals().get("chronicle_lang",
+                               "Traditional Chinese (繁體中文)")
+
+
+def write_headless_environment(sim_folder, step, movements):
+  """
+  In headless mode the backend plays the frontend's role: after computing
+  the personas' next tiles, it writes the environment file the next step
+  will consume, so the world advances without any browser attached.
+  """
+  env = {}
+  for persona_name, info in movements["persona"].items():
+    x, y = info["movement"]
+    env[persona_name] = {"maze": "the_ville", "x": x, "y": y}
+  with open(f"{sim_folder}/environment/{step}.json", "w") as outfile:
+    outfile.write(json.dumps(env, indent=2))
 
 ##############################################################################
 #                                  REVERIE                                   #
@@ -153,6 +172,10 @@ class ReverieServer:
     # World-event engine (elections, festivals, rumors, custom broadcasts).
     # Events persist in <sim_folder>/reverie/events.json across save/fork.
     self.events = EventManager(sim_folder, fs_temp_storage)
+
+    # Headless mode (no browser needed) and the daily chronicle.
+    self.headless = HEADLESS_MODE
+    self._day_start_step = self.step
 
     # SIGNALING THE FRONTEND SERVER: 
     # curr_sim_code.json contains the current simulation code, and
@@ -375,15 +398,16 @@ class ReverieServer:
       # new environment file that matches our step count. That's when we run 
       # the content of this for loop. Otherwise, we just wait. 
       curr_env_file = f"{sim_folder}/environment/{self.step}.json"
+      env_retrieved = False
       if check_if_file_exists(curr_env_file):
         # If we have an environment file, it means we have a new perception
         # input to our personas. So we first retrieve it.
-        try: 
+        try:
           # Try and save block for robustness of the while loop.
           with open(curr_env_file) as json_file:
             new_env = json.load(json_file)
             env_retrieved = True
-        except: 
+        except:
           pass
       
         if env_retrieved:
@@ -487,8 +511,28 @@ class ReverieServer:
 
           # After this cycle, the world takes one step forward, and the
           # current time moves by <sec_per_step> amount.
+          prev_date = self.curr_time.date()
           self.step += 1
           self.curr_time += datetime.timedelta(seconds=self.sec_per_step)
+
+          if self.headless:
+            # Play the frontend's role so the world advances browser-free,
+            # and keep curr_step.json fresh so a browser can join anytime.
+            write_headless_environment(sim_folder, self.step, movements)
+            with open(f"{fs_temp_storage}/curr_step.json", "w") as outfile:
+              outfile.write(json.dumps({"step": self.step}, indent=2))
+
+          # A game day just ended: write today's issue of the chronicle.
+          if CHRONICLE_ENABLED and self.curr_time.date() != prev_date:
+            try:
+              path = chronicle.generate_chronicle(
+                sim_folder, self._day_start_step, self.step - 1,
+                lang=CHRONICLE_LANG)
+              if path:
+                print (f"[chronicle] daily issue written: {path}")
+            except Exception:
+              traceback.print_exc()
+            self._day_start_step = self.step
 
           # Auto-checkpoint so a crash (API timeout etc.) loses at most
           # CHECKPOINT_FREQ steps of progress.
@@ -565,11 +609,31 @@ class ReverieServer:
           # Example: save
           self.save()
 
-        elif sim_command[:3].lower() == "run": 
+        elif sim_command.lower() == "run forever":
+          # Runs indefinitely (until crash, cost limit, or Ctrl-C).
+          # Best combined with headless mode for 24/7 operation.
+          rs.start_server(10 ** 9)
+
+        elif sim_command[:3].lower() == "run":
           # Runs the number of steps specified in the prompt.
           # Example: run 1000
           int_count = int(sim_command.split()[-1])
           rs.start_server(int_count)
+
+        elif sim_command.lower() in ["headless on", "headless off"]:
+          # Toggle browser-free stepping for this session.
+          self.headless = sim_command.lower() == "headless on"
+          ret_str += (f"Headless mode "
+                      f"{'ON -- the world advances without a browser.' if self.headless else 'OFF -- a browser tab drives stepping.'}")
+
+        elif sim_command.lower() == "chronicle now":
+          # Write a chronicle for the current (partial) game day.
+          path = chronicle.generate_chronicle(
+            sim_folder, self._day_start_step, self.step - 1,
+            lang=CHRONICLE_LANG)
+          ret_str += (f"Chronicle written: {path}" if path
+                      else "Nothing to summarize yet -- run some steps "
+                           "first.")
 
         elif ("print persona schedule" 
               in sim_command[:22].lower()): 
@@ -656,6 +720,9 @@ class ReverieServer:
           ret_str += (
             "Commands:\n"
             "  run <count>                     -- run <count> simulation steps\n"
+            "  run forever                     -- run until stopped (24/7 mode)\n"
+            "  headless on|off                 -- advance without a browser tab\n"
+            "  chronicle now                   -- write today's newspaper issue now\n"
             "  save                            -- save current progress\n"
             "  fin                             -- save and quit\n"
             "  exit                            -- quit WITHOUT saving (deletes this sim)\n"
@@ -844,17 +911,30 @@ class ReverieServer:
 
 
 if __name__ == '__main__':
-  # rs = ReverieServer("base_the_ville_isabella_maria_klaus", 
-  #                    "July1_the_ville_isabella_maria_klaus-step-3-1")
-  # rs = ReverieServer("July1_the_ville_isabella_maria_klaus-step-3-20", 
-  #                    "July1_the_ville_isabella_maria_klaus-step-3-21")
-  # rs.open_server()
+  # Non-interactive mode for 24/7 operation (e.g. `docker compose up -d
+  # autorun`): set REVERIE_FORK_SIM and REVERIE_NEW_SIM, and optionally
+  # REVERIE_AUTORUN to a step count or "forever". Autorun implies headless.
+  origin = os.environ.get("REVERIE_FORK_SIM", "").strip()
+  target = os.environ.get("REVERIE_NEW_SIM", "").strip()
+  autorun = os.environ.get("REVERIE_AUTORUN", "").strip()
 
-  origin = input("Enter the name of the forked simulation: ").strip()
-  target = input("Enter the name of the new simulation: ").strip()
+  if not (origin and target):
+    origin = input("Enter the name of the forked simulation: ").strip()
+    target = input("Enter the name of the new simulation: ").strip()
 
   rs = ReverieServer(origin, target)
-  rs.open_server()
+
+  if autorun:
+    rs.headless = True
+    steps = 10 ** 9 if autorun.lower() == "forever" else int(autorun)
+    print (f"Autorun: headless, {autorun} steps. "
+           f"Watch at /simulator_home; read /chronicle/.")
+    try:
+      rs.start_server(steps)
+    finally:
+      rs.save()
+  else:
+    rs.open_server()
 
 
 

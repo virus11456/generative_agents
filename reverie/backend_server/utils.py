@@ -98,6 +98,15 @@ key_owner = os.environ.get("KEY_OWNER", "Anonymous")
 # These performance knobs can also be set on the /settings web page.
 cost_limit_usd = _cfg_num("cost_limit_usd", "COST_LIMIT_USD", 0.0)
 
+# Headless mode: the backend advances the world without a browser tab by
+# writing the environment files itself. Open simulator_home anytime to watch.
+headless_mode = _cfg_bool("headless", "HEADLESS", False)
+# The Ville Chronicle: auto-summarize each completed game day into a
+# newspaper article (one LLM call per game day).
+chronicle_enabled = _cfg_bool("chronicle", "CHRONICLE", True)
+chronicle_lang = _cfg("chronicle_lang", "CHRONICLE_LANG",
+                      "Traditional Chinese (繁體中文)")
+
 llm_cache_enabled = _cfg_bool("llm_cache", "LLM_CACHE", True)
 llm_cache_path = os.environ.get("LLM_CACHE_PATH", "")
 parallel_personas = _cfg_bool("parallel_personas", "PARALLEL_PERSONAS", True)

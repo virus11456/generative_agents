@@ -237,6 +237,43 @@ class EventsPageTests(SimpleTestCase):
     self.assertEqual(commands[0], {"action": "remove", "id": "3"})
 
 
+class ChroniclePageTests(SimpleTestCase):
+  SIM = "test_chr_sim"
+
+  def setUp(self):
+    os.environ.pop("SETTINGS_TOKEN", None)
+    os.makedirs(f"storage/{self.SIM}/chronicle", exist_ok=True)
+    os.makedirs(f"storage/{self.SIM}/reverie", exist_ok=True)
+    with open(f"storage/{self.SIM}/reverie/meta.json", "w") as f:
+      json.dump({"persona_names": ["Kim Tester"]}, f)
+    for day, text in [("2023-02-13.md", "# Issue One\nAna jogged."),
+                      ("2023-02-14.md", "# Issue Two\nBo baked.")]:
+      with open(f"storage/{self.SIM}/chronicle/{day}", "w") as f:
+        f.write(text)
+
+  def tearDown(self):
+    import shutil
+    shutil.rmtree(f"storage/{self.SIM}", ignore_errors=True)
+    os.environ.pop("SETTINGS_TOKEN", None)
+
+  def test_lists_issues_newest_first_and_shows_latest(self):
+    response = self.client.get(f"/chronicle/?sim={self.SIM}")
+    self.assertEqual(response.status_code, 200)
+    self.assertContains(response, "2023-02-14.md")
+    self.assertContains(response, "Issue Two")
+
+  def test_select_specific_day(self):
+    response = self.client.get(
+      f"/chronicle/?sim={self.SIM}&day=2023-02-13.md")
+    self.assertContains(response, "Issue One")
+
+  def test_token_protection(self):
+    os.environ["SETTINGS_TOKEN"] = "s3cret"
+    self.assertEqual(self.client.get("/chronicle/").status_code, 403)
+    self.assertEqual(
+      self.client.get("/chronicle/?token=s3cret").status_code, 200)
+
+
 class IntervenePageTests(SimpleTestCase):
   INTERVENTIONS_FILE = "temp_storage/interventions.json"
 

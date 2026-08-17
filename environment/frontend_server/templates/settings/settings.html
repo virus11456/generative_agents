@@ -119,6 +119,27 @@
              min="0" value="{{ cfg.checkpoint_freq }}" placeholder="50">
     </div>
 
+    <div class="section">
+      <strong>24/7 &amp; chronicle</strong>
+
+      <label for="headless">Headless mode (advance without a browser)</label>
+      <select id="headless" name="headless">
+        <option value="0" {% if cfg.headless != "1" %}selected{% endif %}>Off -- a browser tab drives stepping</option>
+        <option value="1" {% if cfg.headless == "1" %}selected{% endif %}>On -- the world runs by itself</option>
+      </select>
+
+      <label for="chronicle">Daily chronicle (auto newspaper per game day)</label>
+      <select id="chronicle" name="chronicle">
+        <option value="1" {% if cfg.chronicle != "0" %}selected{% endif %}>On (one LLM call per game day)</option>
+        <option value="0" {% if cfg.chronicle == "0" %}selected{% endif %}>Off</option>
+      </select>
+
+      <label for="chronicle_lang">Chronicle language</label>
+      <input id="chronicle_lang" name="chronicle_lang"
+             value="{{ cfg.chronicle_lang }}"
+             placeholder="Traditional Chinese (繁體中文)">
+    </div>
+
     <button type="submit">Save</button>
   </form>
 

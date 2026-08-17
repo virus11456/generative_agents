@@ -6,8 +6,9 @@ Description: This defines the "Plan" module for generative agents.
 """
 import datetime
 import math
-import random 
+import random
 import sys
+import threading
 import time
 sys.path.append('../../')
 
@@ -15,6 +16,11 @@ from global_methods import *
 from persona.prompt_template.run_gpt_prompt import *
 from persona.cognitive_modules.retrieve import *
 from persona.cognitive_modules.converse import *
+
+# When persona steps run in parallel (see reverie.py), reacting to another
+# persona reads and mutates BOTH personas' state (_chat_react/_create_react).
+# This lock serializes those cross-persona interactions.
+_interaction_lock = threading.Lock()
 
 ##############################################################################
 # CHAPTER 2: Generate
@@ -977,16 +983,17 @@ def plan(persona, maze, personas, new_day, retrieved):
   #         a) "chat with {target_persona.name}"
   #         b) "react"
   #         c) False
-  if focused_event: 
-    reaction_mode = _should_react(persona, focused_event, personas)
-    if reaction_mode: 
-      # If we do want to chat, then we generate conversation 
-      if reaction_mode[:9] == "chat with":
-        _chat_react(maze, persona, focused_event, reaction_mode, personas)
-      elif reaction_mode[:4] == "wait": 
-        _wait_react(persona, reaction_mode)
-      # elif reaction_mode == "do other things": 
-      #   _chat_react(persona, focused_event, reaction_mode, personas)
+  if focused_event:
+    with _interaction_lock:
+      reaction_mode = _should_react(persona, focused_event, personas)
+      if reaction_mode:
+        # If we do want to chat, then we generate conversation
+        if reaction_mode[:9] == "chat with":
+          _chat_react(maze, persona, focused_event, reaction_mode, personas)
+        elif reaction_mode[:4] == "wait":
+          _wait_react(persona, reaction_mode)
+        # elif reaction_mode == "do other things":
+        #   _chat_react(persona, focused_event, reaction_mode, personas)
 
   # Step 3: Chat-related state clean up. 
   # If the persona is not chatting with anyone, we clean up any of the 

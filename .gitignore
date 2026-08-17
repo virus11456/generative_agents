@@ -1,5 +1,6 @@
-reverie/backend_server/utils.py
 frontend_server/settings/local.py
+reverie/backend_server/llm_cache.sqlite
+llm_config.json
 storage/*
 static_dirs/*
 

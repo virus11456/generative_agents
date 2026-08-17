@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>LLM Provider Settings</title>
+  <style>
+    body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+           background: #f4f4f6; margin: 0; padding: 2rem; color: #222; }
+    .card { max-width: 640px; margin: 0 auto; background: #fff;
+            border-radius: 10px; padding: 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+    h1 { margin-top: 0; font-size: 1.4rem; }
+    label { display: block; margin: 1rem 0 .3rem; font-weight: 600;
+            font-size: .9rem; }
+    input, select { width: 100%; box-sizing: border-box; padding: .55rem;
+                    border: 1px solid #ccc; border-radius: 6px;
+                    font-size: .95rem; }
+    .hint { font-size: .8rem; color: #666; margin-top: .25rem; }
+    .section { margin-top: 1.6rem; padding-top: 1rem;
+               border-top: 1px solid #eee; }
+    button { margin-top: 1.6rem; width: 100%; padding: .7rem;
+             background: #2563eb; color: #fff; border: 0;
+             border-radius: 6px; font-size: 1rem; cursor: pointer; }
+    button:hover { background: #1d4ed8; }
+    .ok { background: #ecfdf5; border: 1px solid #10b981; color: #065f46;
+          padding: .6rem .8rem; border-radius: 6px; margin-bottom: 1rem; }
+    .warn { background: #fffbeb; border: 1px solid #f59e0b; color: #92400e;
+            padding: .6rem .8rem; border-radius: 6px; margin-top: 1.6rem;
+            font-size: .85rem; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>LLM Provider Settings</h1>
+
+  {% if saved %}
+  <div class="ok">Saved. Restart <code>reverie.py</code> to apply the new
+    settings to the simulation backend.</div>
+  {% endif %}
+
+  <form method="post">
+    <input type="hidden" name="token" value="{{ token }}">
+
+    <label for="provider">Provider preset</label>
+    <select id="provider" name="provider" onchange="applyPreset()">
+      <option value="openai">OpenAI (ChatGPT)</option>
+      <option value="deepseek">DeepSeek</option>
+      <option value="minimax">MiniMax</option>
+      <option value="gemini">Google Gemini</option>
+      <option value="ollama">Ollama (local)</option>
+      <option value="custom">Custom (any OpenAI-compatible)</option>
+    </select>
+    <div class="hint">Selecting a preset fills in the endpoint and default
+      models below — you can still edit every field.</div>
+
+    <label for="base_url">Chat API base URL</label>
+    <input id="base_url" name="base_url" value="{{ cfg.base_url }}"
+           placeholder="https://api.openai.com/v1">
+
+    <label for="api_key">Chat API key</label>
+    <input id="api_key" name="api_key" type="password"
+           placeholder="{% if api_key_masked %}saved: {{ api_key_masked }} (leave blank to keep){% else %}sk-...{% endif %}">
+
+    <label for="chat_model">Chat model</label>
+    <input id="chat_model" name="chat_model" value="{{ cfg.chat_model }}"
+           placeholder="gpt-4o-mini">
+
+    <label for="smart_chat_model">High-stakes chat model (optional)</label>
+    <input id="smart_chat_model" name="smart_chat_model"
+           value="{{ cfg.smart_chat_model }}"
+           placeholder="defaults to the chat model">
+
+    <div class="section">
+      <strong>Embeddings</strong>
+      <div class="hint">DeepSeek and MiniMax do not offer OpenAI-compatible
+        embeddings — when using them for chat, point embeddings at OpenAI,
+        Gemini, or Ollama here. Leave blank to reuse the chat endpoint/key.
+      </div>
+
+      <label for="embedding_base_url">Embedding API base URL</label>
+      <input id="embedding_base_url" name="embedding_base_url"
+             value="{{ cfg.embedding_base_url }}"
+             placeholder="leave blank to reuse chat endpoint">
+
+      <label for="embedding_api_key">Embedding API key</label>
+      <input id="embedding_api_key" name="embedding_api_key" type="password"
+             placeholder="{% if embedding_api_key_masked %}saved: {{ embedding_api_key_masked }} (leave blank to keep){% else %}leave blank to reuse chat key{% endif %}">
+
+      <label for="embedding_model">Embedding model</label>
+      <input id="embedding_model" name="embedding_model"
+             value="{{ cfg.embedding_model }}"
+             placeholder="text-embedding-3-small">
+    </div>
+
+    <button type="submit">Save</button>
+  </form>
+
+  <div class="warn">Keys are stored in <code>llm_config.json</code> at the
+    repository root (file mode 600) and are never displayed back in full.
+    On a public server, protect this page by setting the
+    <code>SETTINGS_TOKEN</code> environment variable and appending
+    <code>?token=...</code> to the URL, and firewall the port or serve
+    behind a reverse proxy.</div>
+</div>
+
+<script>
+  const PRESETS = {
+    openai:  { base_url: "https://api.openai.com/v1",
+               chat_model: "gpt-4o-mini",
+               embedding_base_url: "",
+               embedding_model: "text-embedding-3-small" },
+    deepseek:{ base_url: "https://api.deepseek.com",
+               chat_model: "deepseek-chat",
+               embedding_base_url: "https://api.openai.com/v1",
+               embedding_model: "text-embedding-3-small" },
+    minimax: { base_url: "https://api.minimax.io/v1",
+               chat_model: "MiniMax-Text-01",
+               embedding_base_url: "https://api.openai.com/v1",
+               embedding_model: "text-embedding-3-small" },
+    gemini:  { base_url: "https://generativelanguage.googleapis.com/v1beta/openai/",
+               chat_model: "gemini-2.0-flash",
+               embedding_base_url: "",
+               embedding_model: "text-embedding-004" },
+    ollama:  { base_url: "http://localhost:11434/v1",
+               chat_model: "llama3.1",
+               embedding_base_url: "",
+               embedding_model: "nomic-embed-text" },
+    custom:  { base_url: "", chat_model: "",
+               embedding_base_url: "", embedding_model: "" },
+  };
+
+  function applyPreset() {
+    const p = PRESETS[document.getElementById("provider").value];
+    if (!p) return;
+    for (const [field, value] of Object.entries(p)) {
+      document.getElementById(field).value = value;
+    }
+  }
+
+  // Restore the saved provider selection without overwriting saved fields.
+  const savedProvider = "{{ cfg.provider|default:'openai'|escapejs }}";
+  if (PRESETS[savedProvider]) {
+    document.getElementById("provider").value = savedProvider;
+  }
+</script>
+</body>
+</html>

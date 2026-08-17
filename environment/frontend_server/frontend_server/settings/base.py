@@ -25,7 +25,8 @@ SECRET_KEY = 'c7l%1%b=2sh$o9zqvd4i*h8*__^@-5sm-y)m(1ib2t92)43@62'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+# Comma-separated list, e.g. "myvps.example.com,203.0.113.7".
+ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "*").split(",")
 
 
 # Application definition
@@ -39,7 +40,6 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'translator',
     'corsheaders',
-    'storages',
 ]
 
 MIDDLEWARE = [
@@ -145,3 +145,5 @@ MEDIA_ROOT = os.path.join(os.path.dirname(BASE_DIR), "media_root")
 
 
 
+
+DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'

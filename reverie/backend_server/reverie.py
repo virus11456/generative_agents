@@ -18,6 +18,7 @@ term "personas" to refer to generative agents, "associative memory" to refer
 to the memory stream, and "reverie" to refer to the overarching simulation 
 framework.
 """
+import concurrent.futures
 import json
 import numpy
 import datetime
@@ -28,12 +29,20 @@ import os
 import shutil
 import traceback
 
-from selenium import webdriver
-
 from global_methods import *
 from utils import *
 from maze import *
 from persona.persona import *
+from persona.prompt_template.gpt_structure import (format_llm_stats,
+                                                   get_llm_stats,
+                                                   save_llm_stats)
+
+# Performance/robustness knobs (overridable in utils.py; the globals().get
+# fallbacks keep older hand-written utils.py files working).
+PARALLEL_PERSONAS = globals().get("parallel_personas", True)
+MAX_PARALLEL_WORKERS = globals().get("max_parallel_workers", 8)
+CHECKPOINT_FREQ = globals().get("checkpoint_freq", 50)
+COST_LIMIT_USD = globals().get("cost_limit_usd", 0)
 
 ##############################################################################
 #                                  REVERIE                                   #
@@ -132,10 +141,13 @@ class ReverieServer:
       self.maze.tiles[p_y][p_x]["events"].add(curr_persona.scratch
                                               .get_curr_event_and_desc())
 
-    # REVERIE SETTINGS PARAMETERS:  
+    # REVERIE SETTINGS PARAMETERS:
     # <server_sleep> denotes the amount of time that our while loop rests each
-    # cycle; this is to not kill our machine. 
+    # cycle; this is to not kill our machine.
     self.server_sleep = 0.1
+
+    # Whether the 80%-of-cost-limit warning has been printed yet.
+    self._cost_warned = False
 
     # SIGNALING THE FRONTEND SERVER: 
     # curr_sim_code.json contains the current simulation code, and
@@ -182,12 +194,57 @@ class ReverieServer:
       outfile.write(json.dumps(reverie_meta, indent=2))
 
     # Save the personas.
-    for persona_name, persona in self.personas.items(): 
+    for persona_name, persona in self.personas.items():
       save_folder = f"{sim_folder}/personas/{persona_name}/bootstrap_memory"
       persona.save(save_folder)
 
+    # Save LLM usage/cost statistics alongside the simulation.
+    try:
+      save_llm_stats(f"{sim_folder}/reverie/llm_stats.json")
+    except Exception:
+      pass
 
-  def start_path_tester_server(self): 
+
+  def _apply_pending_interventions(self):
+    """
+    The frontend's /intervene page queues whispers into
+    <fs_temp_storage>/interventions.json. Between simulation steps we pick
+    them up and inject them into the personas' memory streams. Whispers for
+    personas that have not taken a step yet (no curr_time) are left queued
+    for the next cycle.
+    """
+    interventions_file = f"{fs_temp_storage}/interventions.json"
+    if not check_if_file_exists(interventions_file):
+      return
+    try:
+      with open(interventions_file) as f:
+        items = json.load(f)
+      os.remove(interventions_file)
+    except (OSError, ValueError):
+      return
+
+    requeue = []
+    for item in items:
+      persona_name = str(item.get("persona", "")).strip()
+      whisper = str(item.get("whisper", "")).strip()
+      if persona_name not in self.personas or not whisper:
+        print (f"[intervene] dropped invalid whisper: {item}")
+        continue
+      if not self.personas[persona_name].scratch.curr_time:
+        requeue += [item]
+        continue
+      try:
+        load_history_via_whisper(self.personas, [[persona_name, whisper]])
+        print (f"[intervene] whispered to {persona_name}: {whisper}")
+      except Exception:
+        traceback.print_exc()
+
+    if requeue:
+      with open(interventions_file, "w") as f:
+        f.write(json.dumps(requeue, indent=2))
+
+
+  def start_path_tester_server(self):
     """
     Starts the path tester server. This is for generating the spatial memory
     that we need for bootstrapping a persona's state. 
@@ -324,9 +381,12 @@ class ReverieServer:
         except: 
           pass
       
-        if env_retrieved: 
-          # This is where we go through <game_obj_cleanup> to clean up all 
-          # object actions that were used in this cylce. 
+        if env_retrieved:
+          # Apply any whispers queued from the frontend's /intervene page.
+          self._apply_pending_interventions()
+
+          # This is where we go through <game_obj_cleanup> to clean up all
+          # object actions that were used in this cylce.
           for key, val in game_obj_cleanup.items(): 
             # We turn all object actions to their blank form (with None). 
             self.maze.turn_event_from_tile_idle(key, val)
@@ -368,17 +428,33 @@ class ReverieServer:
           # move. The movement for each of the personas comes in the form of
           # x y coordinates where the persona will move towards. e.g., (50, 34)
           # This is where the core brains of the personas are invoked. 
-          movements = {"persona": dict(), 
+          movements = {"persona": dict(),
                        "meta": dict()}
-          for persona_name, persona in self.personas.items(): 
-            # <next_tile> is a x,y coordinate. e.g., (58, 9)
-            # <pronunciatio> is an emoji. e.g., "\ud83d\udca4"
-            # <description> is a string description of the movement. e.g., 
-            #   writing her next novel (editing her novel) 
-            #   @ double studio:double studio:common room:sofa
-            next_tile, pronunciatio, description = persona.move(
-              self.maze, self.personas, self.personas_tile[persona_name], 
+
+          # <next_tile> is a x,y coordinate. e.g., (58, 9)
+          # <pronunciatio> is an emoji. e.g., "\ud83d\udca4"
+          # <description> is a string description of the movement. e.g.,
+          #   writing her next novel (editing her novel)
+          #   @ double studio:double studio:common room:sofa
+          def _move_persona(persona_name):
+            persona = self.personas[persona_name]
+            return persona_name, persona.move(
+              self.maze, self.personas, self.personas_tile[persona_name],
               self.curr_time)
+
+          persona_names = list(self.personas.keys())
+          if PARALLEL_PERSONAS and len(persona_names) > 1:
+            # Persona steps run concurrently; cross-persona interactions
+            # (conversations) are serialized by a lock inside plan.py.
+            workers = min(MAX_PARALLEL_WORKERS, len(persona_names))
+            with concurrent.futures.ThreadPoolExecutor(workers) as pool:
+              move_results = list(pool.map(_move_persona, persona_names))
+          else:
+            move_results = [_move_persona(name) for name in persona_names]
+
+          for persona_name, (next_tile, pronunciatio,
+                             description) in move_results:
+            persona = self.personas[persona_name]
             movements["persona"][persona_name] = {}
             movements["persona"][persona_name]["movement"] = next_tile
             movements["persona"][persona_name]["pronunciatio"] = pronunciatio
@@ -401,10 +477,30 @@ class ReverieServer:
           with open(curr_move_file, "w") as outfile: 
             outfile.write(json.dumps(movements, indent=2))
 
-          # After this cycle, the world takes one step forward, and the 
-          # current time moves by <sec_per_step> amount. 
+          # After this cycle, the world takes one step forward, and the
+          # current time moves by <sec_per_step> amount.
           self.step += 1
           self.curr_time += datetime.timedelta(seconds=self.sec_per_step)
+
+          # Auto-checkpoint so a crash (API timeout etc.) loses at most
+          # CHECKPOINT_FREQ steps of progress.
+          if CHECKPOINT_FREQ and self.step % CHECKPOINT_FREQ == 0:
+            self.save()
+
+          # Spending ceiling: halt (with progress saved) once the estimated
+          # LLM cost reaches COST_LIMIT_USD. Warn at 80%.
+          if COST_LIMIT_USD:
+            spent = get_llm_stats()["est_total_cost_usd"]
+            if spent >= COST_LIMIT_USD:
+              self.save()
+              print (f"COST LIMIT REACHED: est. ${spent} >= "
+                     f"${COST_LIMIT_USD}. Progress saved -- resume by "
+                     f"forking '{self.sim_code}' (or raise COST_LIMIT_USD).")
+              break
+            if spent >= 0.8 * COST_LIMIT_USD and not self._cost_warned:
+              self._cost_warned = True
+              print (f"COST WARNING: est. ${spent} is over 80% of the "
+                     f"${COST_LIMIT_USD} limit.")
 
           int_counter -= 1
           
@@ -543,8 +639,66 @@ class ReverieServer:
           # Ex: print persona spatial memory Isabella Rodriguez
           self.personas[" ".join(sim_command.split()[-2:])].s_mem.print_tree()
 
-        elif ("print current time" 
-              in sim_command[:18].lower()): 
+        elif sim_command.lower() == "stats":
+          # Print LLM token usage and estimated cost so far.
+          # Example: stats
+          ret_str += format_llm_stats()
+
+        elif sim_command.lower() in ["help", "h", "?"]:
+          ret_str += (
+            "Commands:\n"
+            "  run <count>                     -- run <count> simulation steps\n"
+            "  save                            -- save current progress\n"
+            "  fin                             -- save and quit\n"
+            "  exit                            -- quit WITHOUT saving (deletes this sim)\n"
+            "  stats                           -- LLM token usage and estimated cost\n"
+            "  whisper <persona>: <thought>    -- inject a thought into a persona's memory\n"
+            "                                     e.g. whisper Isabella Rodriguez: I am "
+            "planning a party tonight\n"
+            "  interview <persona>             -- chat with a persona (does not alter "
+            "its memory)\n"
+            "  print persona schedule <persona>\n"
+            "  print all persona schedule\n"
+            "  print persona current tile <persona>\n"
+            "  print persona associative memory (event|thought|chat) <persona>\n"
+            "  print persona spatial memory <persona>\n"
+            "  print current time\n"
+            "  print tile event <x>, <y>\n"
+            "  call -- load history the_ville/<file>.csv\n")
+
+        elif sim_command[:7].lower() == "whisper":
+          # Inject a thought straight into a persona's memory stream. This is
+          # the same mechanism as "call -- load history" but for a single
+          # whisper, e.g.:
+          # whisper Isabella Rodriguez: I am throwing a party tonight
+          body = sim_command[7:].strip()
+          persona_name, sep, whisper = body.partition(":")
+          persona_name = persona_name.strip()
+          whisper = whisper.strip()
+          if not sep or persona_name not in self.personas or not whisper:
+            ret_str += ("Usage: whisper <persona name>: <thought>\n"
+                        f"Known personas: {', '.join(self.personas.keys())}")
+          elif not self.personas[persona_name].scratch.curr_time:
+            ret_str += ("This simulation has not taken a step yet -- "
+                        "run at least 1 step before whispering.")
+          else:
+            load_history_via_whisper(self.personas,
+                                     [[persona_name, whisper]])
+            ret_str += f"Whispered to {persona_name}: {whisper}"
+
+        elif sim_command[:9].lower() == "interview":
+          # Stateless chat session with a persona (alias for
+          # "call -- analysis"). Nothing is saved to the persona's memory.
+          # Example: interview Isabella Rodriguez
+          persona_name = sim_command[9:].strip()
+          if persona_name not in self.personas:
+            ret_str += ("Usage: interview <persona name>\n"
+                        f"Known personas: {', '.join(self.personas.keys())}")
+          else:
+            self.personas[persona_name].open_convo_session("analysis")
+
+        elif ("print current time"
+              in sim_command[:18].lower()):
           # Print the current time of the world. 
           # Ex: print current time
           ret_str += f'{self.curr_time.strftime("%B %d, %Y, %H:%M:%S")}\n'
@@ -594,7 +748,15 @@ class ReverieServer:
 
       except:
         traceback.print_exc()
-        print ("Error.")
+        # Emergency checkpoint: a crash mid-run (commonly an API error)
+        # should not lose completed steps. The saved state can be resumed by
+        # forking from this simulation.
+        try:
+          self.save()
+          print (f"Error. Progress saved -- resume by forking "
+                 f"'{self.sim_code}'.")
+        except Exception:
+          print ("Error. (Emergency save also failed.)")
         pass
 
 

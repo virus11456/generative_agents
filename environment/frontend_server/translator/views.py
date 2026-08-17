@@ -14,7 +14,7 @@ from django.shortcuts import render, redirect, HttpResponseRedirect
 from django.http import HttpResponse, JsonResponse
 from global_methods import *
 
-from django.contrib.staticfiles.templatetags.staticfiles import static
+from django.templatetags.static import static
 from .models import *
 
 def landing(request): 
@@ -321,3 +321,137 @@ def path_tester_update(request):
 
 
 
+
+
+# ============================================================================
+# LLM provider settings page
+# ============================================================================
+
+_LLM_CONFIG_FIELDS = ["provider", "base_url", "chat_model",
+                      "smart_chat_model", "embedding_base_url",
+                      "embedding_model"]
+_LLM_SECRET_FIELDS = ["api_key", "embedding_api_key"]
+
+
+def _llm_config_path():
+  # Shared with the backend (reverie/backend_server/utils.py): a single
+  # llm_config.json at the repository root.
+  return os.environ.get("LLM_CONFIG_PATH", os.path.abspath(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "..", "..",
+    "llm_config.json")))
+
+
+def _mask_key(key):
+  if not key:
+    return ""
+  if len(key) <= 8:
+    return "*" * len(key)
+  return key[:4] + "*" * 6 + key[-4:]
+
+
+def llm_settings(request):
+  """
+  Web UI for configuring the LLM provider (OpenAI, DeepSeek, MiniMax,
+  Gemini, Ollama, or any OpenAI-compatible endpoint). Saves to a
+  llm_config.json shared with the simulation backend; restart reverie.py
+  to apply changes. Optionally protected by the SETTINGS_TOKEN env var.
+  """
+  required_token = os.environ.get("SETTINGS_TOKEN", "")
+  supplied_token = request.POST.get("token", request.GET.get("token", ""))
+  if required_token and supplied_token != required_token:
+    return HttpResponse(
+      "Forbidden: this page is protected. Append ?token=<SETTINGS_TOKEN> "
+      "to the URL.", status=403)
+
+  cfg_path = _llm_config_path()
+  try:
+    with open(cfg_path) as f:
+      cfg = json.load(f)
+  except (OSError, ValueError):
+    cfg = {}
+
+  saved = False
+  if request.method == "POST":
+    for field in _LLM_CONFIG_FIELDS:
+      cfg[field] = request.POST.get(field, "").strip()
+    for field in _LLM_SECRET_FIELDS:
+      # A blank secret field means "keep the stored key".
+      posted = request.POST.get(field, "").strip()
+      if posted:
+        cfg[field] = posted
+    with open(cfg_path, "w") as f:
+      f.write(json.dumps(cfg, indent=2))
+    try:
+      os.chmod(cfg_path, 0o600)
+    except OSError:
+      pass
+    saved = True
+
+  context = {"cfg": cfg,
+             "api_key_masked": _mask_key(cfg.get("api_key", "")),
+             "embedding_api_key_masked": _mask_key(
+               cfg.get("embedding_api_key", "")),
+             "saved": saved,
+             "token": supplied_token}
+  return render(request, "settings/settings.html", context)
+
+
+# ============================================================================
+# Player intervention page (whisper injection)
+# ============================================================================
+
+def _current_sim_personas():
+  """Return (sim_code, [persona names]) for the running simulation, if any."""
+  try:
+    with open("temp_storage/curr_sim_code.json") as f:
+      sim_code = json.load(f)["sim_code"]
+    with open(f"storage/{sim_code}/reverie/meta.json") as f:
+      return sim_code, json.load(f)["persona_names"]
+  except (OSError, ValueError, KeyError):
+    return None, []
+
+
+def intervene(request):
+  """
+  Queue a whisper for the simulation backend to inject into a persona's
+  memory between steps. Whispers are appended to
+  temp_storage/interventions.json, which reverie.py polls while running.
+  Protected by SETTINGS_TOKEN when set.
+  """
+  required_token = os.environ.get("SETTINGS_TOKEN", "")
+  supplied_token = request.POST.get("token", request.GET.get("token", ""))
+  if required_token and supplied_token != required_token:
+    return HttpResponse(
+      "Forbidden: this page is protected. Append ?token=<SETTINGS_TOKEN> "
+      "to the URL.", status=403)
+
+  sim_code, persona_names = _current_sim_personas()
+
+  queued = False
+  error = ""
+  if request.method == "POST":
+    persona_name = request.POST.get("persona", "").strip()
+    whisper = request.POST.get("whisper", "").strip()
+    if not persona_name or not whisper:
+      error = "Both a persona and a whisper are required."
+    else:
+      interventions_file = "temp_storage/interventions.json"
+      try:
+        with open(interventions_file) as f:
+          items = json.load(f)
+      except (OSError, ValueError):
+        items = []
+      items += [{"persona": persona_name, "whisper": whisper}]
+      # Atomic replace so the backend never reads a half-written file.
+      tmp_file = interventions_file + ".tmp"
+      with open(tmp_file, "w") as f:
+        f.write(json.dumps(items, indent=2))
+      os.replace(tmp_file, interventions_file)
+      queued = True
+
+  context = {"sim_code": sim_code,
+             "persona_names": persona_names,
+             "queued": queued,
+             "error": error,
+             "token": supplied_token}
+  return render(request, "intervene/intervene.html", context)

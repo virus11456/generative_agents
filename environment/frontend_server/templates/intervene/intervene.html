@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Intervene in the Simulation</title>
+  <style>
+    body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+           background: #f4f4f6; margin: 0; padding: 2rem; color: #222; }
+    .card { max-width: 640px; margin: 0 auto; background: #fff;
+            border-radius: 10px; padding: 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+    h1 { margin-top: 0; font-size: 1.4rem; }
+    label { display: block; margin: 1rem 0 .3rem; font-weight: 600;
+            font-size: .9rem; }
+    input, select, textarea { width: 100%; box-sizing: border-box;
+                    padding: .55rem; border: 1px solid #ccc;
+                    border-radius: 6px; font-size: .95rem; }
+    textarea { min-height: 90px; resize: vertical; }
+    .hint { font-size: .8rem; color: #666; margin-top: .25rem; }
+    button { margin-top: 1.6rem; width: 100%; padding: .7rem;
+             background: #7c3aed; color: #fff; border: 0;
+             border-radius: 6px; font-size: 1rem; cursor: pointer; }
+    button:hover { background: #6d28d9; }
+    .ok { background: #ecfdf5; border: 1px solid #10b981; color: #065f46;
+          padding: .6rem .8rem; border-radius: 6px; margin-bottom: 1rem; }
+    .err { background: #fef2f2; border: 1px solid #ef4444; color: #991b1b;
+           padding: .6rem .8rem; border-radius: 6px; margin-bottom: 1rem; }
+    .warn { background: #fffbeb; border: 1px solid #f59e0b; color: #92400e;
+            padding: .6rem .8rem; border-radius: 6px; margin-top: 1.6rem;
+            font-size: .85rem; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>Intervene: Whisper to an Agent</h1>
+
+  {% if queued %}
+  <div class="ok">Whisper queued. The simulation backend will inject it
+    before its next step (it must be running -- use <code>run</code> at the
+    simulation prompt).</div>
+  {% endif %}
+  {% if error %}
+  <div class="err">{{ error }}</div>
+  {% endif %}
+
+  <form method="post">
+    <input type="hidden" name="token" value="{{ token }}">
+
+    <label for="persona">Agent</label>
+    {% if persona_names %}
+    <select id="persona" name="persona">
+      {% for name in persona_names %}
+      <option value="{{ name }}">{{ name }}</option>
+      {% endfor %}
+    </select>
+    <div class="hint">Current simulation: {{ sim_code }}</div>
+    {% else %}
+    <input id="persona" name="persona"
+           placeholder="e.g. Isabella Rodriguez">
+    <div class="hint">No running simulation detected -- type the agent's
+      exact name.</div>
+    {% endif %}
+
+    <label for="whisper">Whisper (a thought planted in the agent's mind)</label>
+    <textarea id="whisper" name="whisper"
+      placeholder="e.g. You are planning a Valentine's Day party at Hobbs Cafe tonight at 5pm, and you want to invite everyone you meet"></textarea>
+    <div class="hint">Write it addressed to the agent as "you". The thought
+      is permanent: it will shape the agent's plans and conversations.</div>
+
+    <button type="submit">Whisper</button>
+  </form>
+
+  <div class="warn">The whisper is applied between simulation steps, so the
+    simulation must have run at least one step and be actively running
+    (<code>run &lt;count&gt;</code>). Whispers queued for agents that have
+    not started yet are held until they do.</div>
+</div>
+</body>
+</html>

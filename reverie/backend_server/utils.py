@@ -74,6 +74,10 @@ embedding_base_url = _cfg("embedding_base_url", "EMBEDDING_BASE_URL")
 key_owner = os.environ.get("KEY_OWNER", "Anonymous")
 
 # Cache / performance knobs
+# Hard spending ceiling in USD (estimated from token counts); 0 disables.
+# When the estimate reaches this, the simulation auto-saves and halts.
+cost_limit_usd = float(os.environ.get("COST_LIMIT_USD", "0") or "0")
+
 llm_cache_enabled = os.environ.get("LLM_CACHE", "1") != "0"
 llm_cache_path = os.environ.get("LLM_CACHE_PATH", "")
 parallel_personas = os.environ.get("PARALLEL_PERSONAS", "1") != "0"

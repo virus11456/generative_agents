@@ -34,6 +34,7 @@ from utils import *
 from maze import *
 from persona.persona import *
 from persona.prompt_template.gpt_structure import (format_llm_stats,
+                                                   get_llm_stats,
                                                    save_llm_stats)
 
 # Performance/robustness knobs (overridable in utils.py; the globals().get
@@ -41,6 +42,7 @@ from persona.prompt_template.gpt_structure import (format_llm_stats,
 PARALLEL_PERSONAS = globals().get("parallel_personas", True)
 MAX_PARALLEL_WORKERS = globals().get("max_parallel_workers", 8)
 CHECKPOINT_FREQ = globals().get("checkpoint_freq", 50)
+COST_LIMIT_USD = globals().get("cost_limit_usd", 0)
 
 ##############################################################################
 #                                  REVERIE                                   #
@@ -139,10 +141,13 @@ class ReverieServer:
       self.maze.tiles[p_y][p_x]["events"].add(curr_persona.scratch
                                               .get_curr_event_and_desc())
 
-    # REVERIE SETTINGS PARAMETERS:  
+    # REVERIE SETTINGS PARAMETERS:
     # <server_sleep> denotes the amount of time that our while loop rests each
-    # cycle; this is to not kill our machine. 
+    # cycle; this is to not kill our machine.
     self.server_sleep = 0.1
+
+    # Whether the 80%-of-cost-limit warning has been printed yet.
+    self._cost_warned = False
 
     # SIGNALING THE FRONTEND SERVER: 
     # curr_sim_code.json contains the current simulation code, and
@@ -200,7 +205,46 @@ class ReverieServer:
       pass
 
 
-  def start_path_tester_server(self): 
+  def _apply_pending_interventions(self):
+    """
+    The frontend's /intervene page queues whispers into
+    <fs_temp_storage>/interventions.json. Between simulation steps we pick
+    them up and inject them into the personas' memory streams. Whispers for
+    personas that have not taken a step yet (no curr_time) are left queued
+    for the next cycle.
+    """
+    interventions_file = f"{fs_temp_storage}/interventions.json"
+    if not check_if_file_exists(interventions_file):
+      return
+    try:
+      with open(interventions_file) as f:
+        items = json.load(f)
+      os.remove(interventions_file)
+    except (OSError, ValueError):
+      return
+
+    requeue = []
+    for item in items:
+      persona_name = str(item.get("persona", "")).strip()
+      whisper = str(item.get("whisper", "")).strip()
+      if persona_name not in self.personas or not whisper:
+        print (f"[intervene] dropped invalid whisper: {item}")
+        continue
+      if not self.personas[persona_name].scratch.curr_time:
+        requeue += [item]
+        continue
+      try:
+        load_history_via_whisper(self.personas, [[persona_name, whisper]])
+        print (f"[intervene] whispered to {persona_name}: {whisper}")
+      except Exception:
+        traceback.print_exc()
+
+    if requeue:
+      with open(interventions_file, "w") as f:
+        f.write(json.dumps(requeue, indent=2))
+
+
+  def start_path_tester_server(self):
     """
     Starts the path tester server. This is for generating the spatial memory
     that we need for bootstrapping a persona's state. 
@@ -337,9 +381,12 @@ class ReverieServer:
         except: 
           pass
       
-        if env_retrieved: 
-          # This is where we go through <game_obj_cleanup> to clean up all 
-          # object actions that were used in this cylce. 
+        if env_retrieved:
+          # Apply any whispers queued from the frontend's /intervene page.
+          self._apply_pending_interventions()
+
+          # This is where we go through <game_obj_cleanup> to clean up all
+          # object actions that were used in this cylce.
           for key, val in game_obj_cleanup.items(): 
             # We turn all object actions to their blank form (with None). 
             self.maze.turn_event_from_tile_idle(key, val)
@@ -439,6 +486,21 @@ class ReverieServer:
           # CHECKPOINT_FREQ steps of progress.
           if CHECKPOINT_FREQ and self.step % CHECKPOINT_FREQ == 0:
             self.save()
+
+          # Spending ceiling: halt (with progress saved) once the estimated
+          # LLM cost reaches COST_LIMIT_USD. Warn at 80%.
+          if COST_LIMIT_USD:
+            spent = get_llm_stats()["est_total_cost_usd"]
+            if spent >= COST_LIMIT_USD:
+              self.save()
+              print (f"COST LIMIT REACHED: est. ${spent} >= "
+                     f"${COST_LIMIT_USD}. Progress saved -- resume by "
+                     f"forking '{self.sim_code}' (or raise COST_LIMIT_USD).")
+              break
+            if spent >= 0.8 * COST_LIMIT_USD and not self._cost_warned:
+              self._cost_warned = True
+              print (f"COST WARNING: est. ${spent} is over 80% of the "
+                     f"${COST_LIMIT_USD} limit.")
 
           int_counter -= 1
           

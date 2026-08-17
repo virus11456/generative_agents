@@ -265,7 +265,8 @@ def _chat_request(prompt, model=None, temperature=None, max_tokens=None,
           "response_format" in str(e)):
         del kwargs["response_format"]
         continue
-      time.sleep(2 ** attempt + random.random())
+      if attempt < _MAX_RETRIES - 1:
+        time.sleep(2 ** attempt + random.random())
   _record_usage(model, 0, 0, failed=True)
   raise last_err
 
@@ -515,7 +516,8 @@ def get_embedding(text, model=None):
       return embedding
     except Exception as e:
       last_err = e
-      time.sleep(2 ** attempt + random.random())
+      if attempt < _MAX_RETRIES - 1:
+        time.sleep(2 ** attempt + random.random())
   _record_usage(model, 0, 0, failed=True)
   raise last_err
 

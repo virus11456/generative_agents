@@ -14,7 +14,11 @@ sys.path.insert(0, _BACKEND_DIR)
 
 _TMP = tempfile.mkdtemp(prefix="reverie_test_")
 os.environ["LLM_CACHE_PATH"] = os.path.join(_TMP, "llm_cache.sqlite")
-os.environ.setdefault("OPENAI_API_KEY", "")
+# Hermetic test environment: no API key and no stray llm_config.json may
+# leak in, or the fail-safe tests would attempt real network calls.
+os.environ["OPENAI_API_KEY"] = ""
+os.environ["OPENAI_BASE_URL"] = ""
+os.environ["LLM_CONFIG_PATH"] = os.path.join(_TMP, "no_such_config.json")
 
 from persona.prompt_template import gpt_structure
 
@@ -151,6 +155,56 @@ class TestConfigFilePriority(unittest.TestCase):
     os.environ["LLM_CONFIG_PATH"] = cfg_path
     utils = self._reload_utils()
     self.assertEqual(utils.embedding_api_key, "sk-chat-key")
+
+
+class TestScenarioGenerator(unittest.TestCase):
+  def _identity(self, **overrides):
+    identity = {"innate": "brave, curious",
+                "learned": "Kim is a baker.",
+                "currently": "Kim is opening a shop.",
+                "lifestyle": "Kim goes to bed around 11pm.",
+                "daily_plan_req": "Kim bakes all morning.",
+                "whispers": ["You love bread", "You distrust Bob"]}
+    identity.update(overrides)
+    return identity
+
+  def test_validate_identity_accepts_complete(self):
+    import scenario_generator as sg
+    self.assertTrue(sg.validate_identity(self._identity()))
+
+  def test_validate_identity_rejects_missing_or_empty(self):
+    import scenario_generator as sg
+    self.assertFalse(sg.validate_identity(self._identity(innate="")))
+    bad = self._identity()
+    del bad["whispers"]
+    self.assertFalse(sg.validate_identity(bad))
+    self.assertFalse(sg.validate_identity(self._identity(whispers=[])))
+    self.assertFalse(sg.validate_identity("not a dict"))
+
+  def test_apply_identity_merges_fields_only(self):
+    import scenario_generator as sg
+    scratch = {"name": "Kim", "innate": "old", "learned": "old",
+               "currently": "old", "lifestyle": "old",
+               "daily_plan_req": "old", "living_area": "the Ville:home"}
+    sg.apply_identity(scratch, self._identity())
+    self.assertEqual(scratch["innate"], "brave, curious")
+    self.assertEqual(scratch["name"], "Kim")
+    self.assertEqual(scratch["living_area"], "the Ville:home")
+
+  def test_whispers_to_csv_rows(self):
+    import scenario_generator as sg
+    rows = sg.whispers_to_csv_rows([("Kim", self._identity())])
+    self.assertEqual(rows[0], ["Name", "Whisper"])
+    self.assertEqual(rows[1][0], "Kim")
+    self.assertEqual(rows[1][1], "You love bread; You distrust Bob")
+
+  def test_prompt_includes_story_and_names(self):
+    import scenario_generator as sg
+    prompt = sg.build_identity_prompt("A bakery rivalry", "Kim",
+                                      ["Bob"], self._identity())
+    self.assertIn("A bakery rivalry", prompt)
+    self.assertIn("Kim", prompt)
+    self.assertIn("Bob", prompt)
 
 
 if __name__ == "__main__":

@@ -25,8 +25,11 @@ This repository accompanies our research paper titled "[Generative Agents: Inter
 | 平行化模擬 | 每一步所有 agent 的思考併發執行（原版是逐一排隊），多人模擬速度大幅提升 |
 | 自動存檔 | 每 50 步自動存檔 + 崩潰時緊急存檔，API 逾時不再毀掉整場模擬 |
 | 費用統計 | 隨時輸入 `stats` 查看各模型 token 用量與預估花費 |
-| 玩家介入 | `whisper` 植入想法、`interview` 與 agent 對話，主動影響劇情走向 |
+| 玩家介入 | `whisper` 植入想法、`interview` 與 agent 對話，主動影響劇情走向；也有網頁版 `/intervene/` 面板 |
 | VPS 部署 | 支援公網部署，`ALLOWED_HOSTS`、設定頁 token 保護等都已備妥 |
+| Docker 一鍵部署 | `docker compose up -d` 啟動網頁伺服器、`docker compose run --rm backend` 啟動模擬，免裝 Python 環境 |
+| 成本上限保護 | 設 `COST_LIMIT_USD` 預算上限，花費達 80% 警告、達 100% 自動存檔停止，防止掛機跑出天價帳單 |
+| 劇本產生器 | 一句話的故事設定（中英文皆可）→ 自動生成所有角色的人設、目標、人際關係，開一場全新劇本的模擬 |
 
 ## 快速開始
 
@@ -80,6 +83,7 @@ EMBEDDING_BASE_URL=
 | `PARALLEL_PERSONAS` | `1` | 設 `0` 改回逐一執行 agent |
 | `MAX_PARALLEL_WORKERS` | `8` | 平行執行的執行緒數 |
 | `CHECKPOINT_FREQ` | `50` | 每 N 步自動存檔，設 `0` 關閉 |
+| `COST_LIMIT_USD` | `0`（關閉） | 預估花費達此金額（美元）時自動存檔並停止模擬；達 80% 先警告 |
 | `REVERIE_DEBUG` | `0` | 設 `1` 顯示完整 prompt 除錯輸出 |
 
 ## 模擬指令一覽
@@ -100,6 +104,58 @@ EMBEDDING_BASE_URL=
 **玩家介入玩法提示**：論文中著名的「情人節派對」湧現劇情，就是用 whisper 機制植入一條記憶引發的——你可以 whisper 給某個 agent「今晚要辦派對」，然後觀察消息如何在小鎮傳開、誰會赴約。
 
 費用統計除了 `stats` 指令外，每次存檔也會寫入該模擬資料夾的 `reverie/llm_stats.json`。
+
+### 網頁版介入面板
+不想切到終端機的話，瀏覽器開 [http://localhost:8000/intervene/](http://localhost:8000/intervene/)：下拉選擇 agent、輸入想植入的想法（以「你」的口吻，例如 "You are planning a party tonight"），按下 Whisper 即排入佇列，模擬跑到下一步之間會自動注入。適合邊看 `simulator_home` 地圖邊介入劇情，展示效果極佳。公網部署時同樣受 `SETTINGS_TOKEN` 保護。
+
+## 劇本產生器：一句話開一場新戲
+
+用一段故事設定（**中英文都可以**）自動改寫所有角色的人設、目標與人際關係：
+
+```bash
+cd reverie/backend_server
+python scenario_generator.py \
+  --fork base_the_ville_isabella_maria_klaus \
+  --name startup_drama \
+  --story "三個室友：一人偷偷計畫創業想挖另外兩人入夥，一人正準備出國留學，一人剛失業還瞞著大家"
+```
+
+工具會為每個角色呼叫 LLM 生成新的個性、背景、近況、作息與日常安排（寫回模擬資料），並產出一份人際關係「耳語」CSV。之後照畫面提示執行：
+
+```
+python reverie.py
+  Enter the name of the forked simulation: startup_drama
+  Enter the name of the new simulation: startup_drama_run1
+  Enter option: run 1
+  Enter option: call -- load history the_ville/scenario_startup_drama.csv
+  Enter option: run 1000
+```
+
+用 `--fork base_the_ville_n25` 可以生成 25 人的大型劇本。角色名字與地圖不變（沿用原有精靈圖與空間資料），變的是他們的靈魂。
+
+## 成本上限保護
+
+怕掛機跑出天價帳單？設定預算上限（美元）：
+
+```bash
+COST_LIMIT_USD=5 python reverie.py
+```
+
+預估花費達 80% 時印出警告；達 100% 時自動存檔並停止模擬（進度不會丟，fork 存檔即可續跑）。預設 `0` = 不限制。
+
+## Docker 一鍵部署
+
+裝好 [Docker](https://docs.docker.com/engine/install/) 之後，在專案根目錄：
+
+```bash
+# 啟動網頁（環境）伺服器，背景執行於 8000 埠
+docker compose up -d
+
+# 啟動互動式模擬伺服器
+docker compose run --rm backend
+```
+
+環境變數可寫在專案根目錄的 `.env` 檔（`OPENAI_API_KEY`、`COST_LIMIT_USD`、`SETTINGS_TOKEN`、`ALLOWED_HOSTS`、`FRONTEND_PORT` 等 compose 都會自動帶入），或直接用 `/settings/` 網頁設定。程式碼與模擬存檔都掛載自主機目錄，資料不會因容器重啟而消失。VPS 上這就是最省事的部署方式——裝 Docker、clone、兩條指令開跑。
 
 ## 部署到 VPS
 
@@ -157,6 +213,10 @@ This fork modernizes the original codebase so it runs today:
 * **Python 3.11 + Django 4.2** — dependencies updated, retired APIs replaced, and offline unit tests added under `reverie/backend_server/tests` and `translator/tests.py`.
 * **Player intervention** — `whisper <persona>: <thought>` injects a thought into an agent's memory stream mid-simulation (the paper's Valentine's-party mechanism), `interview <persona>` opens a live chat with an agent, and `help` lists every command.
 * **Web-based provider settings** — visit `/settings` on the environment server to pick a provider preset (OpenAI, DeepSeek, MiniMax, Gemini, Ollama, or any OpenAI-compatible endpoint) and enter API keys in the browser; saved to a git-ignored `llm_config.json` that overrides environment variables.
+* **Web intervention panel** — `/intervene/` lets you whisper a thought into any agent's mind from the browser while the simulation runs.
+* **Scenario generator** — `python scenario_generator.py --name <sim> --story "<premise in any language>"` rewrites every persona's identity and relationships to fit a story premise and produces a loadable whisper CSV.
+* **Cost ceiling** — set `COST_LIMIT_USD` to auto-save and halt the simulation when the estimated spend reaches your budget (warning at 80%).
+* **Docker deployment** — `docker compose up -d` for the web server and `docker compose run --rm backend` for the interactive simulation; state persists via bind mounts.
 
 ## Configuring the LLM Provider from the Browser
 With the environment server running, open [http://localhost:8000/settings/](http://localhost:8000/settings/). Choose a preset — OpenAI, DeepSeek, MiniMax, Gemini, or Ollama — enter your API key, and save. The settings are written to `llm_config.json` at the repository root (file mode 600, git-ignored, keys never rendered back) and take effect the next time you start `reverie.py`.

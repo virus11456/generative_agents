@@ -1,0 +1,7 @@
+.git
+venv
+env
+**/__pycache__
+*.pyc
+llm_config.json
+reverie/backend_server/llm_cache.sqlite

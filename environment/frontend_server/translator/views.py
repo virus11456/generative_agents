@@ -394,3 +394,64 @@ def llm_settings(request):
              "saved": saved,
              "token": supplied_token}
   return render(request, "settings/settings.html", context)
+
+
+# ============================================================================
+# Player intervention page (whisper injection)
+# ============================================================================
+
+def _current_sim_personas():
+  """Return (sim_code, [persona names]) for the running simulation, if any."""
+  try:
+    with open("temp_storage/curr_sim_code.json") as f:
+      sim_code = json.load(f)["sim_code"]
+    with open(f"storage/{sim_code}/reverie/meta.json") as f:
+      return sim_code, json.load(f)["persona_names"]
+  except (OSError, ValueError, KeyError):
+    return None, []
+
+
+def intervene(request):
+  """
+  Queue a whisper for the simulation backend to inject into a persona's
+  memory between steps. Whispers are appended to
+  temp_storage/interventions.json, which reverie.py polls while running.
+  Protected by SETTINGS_TOKEN when set.
+  """
+  required_token = os.environ.get("SETTINGS_TOKEN", "")
+  supplied_token = request.POST.get("token", request.GET.get("token", ""))
+  if required_token and supplied_token != required_token:
+    return HttpResponse(
+      "Forbidden: this page is protected. Append ?token=<SETTINGS_TOKEN> "
+      "to the URL.", status=403)
+
+  sim_code, persona_names = _current_sim_personas()
+
+  queued = False
+  error = ""
+  if request.method == "POST":
+    persona_name = request.POST.get("persona", "").strip()
+    whisper = request.POST.get("whisper", "").strip()
+    if not persona_name or not whisper:
+      error = "Both a persona and a whisper are required."
+    else:
+      interventions_file = "temp_storage/interventions.json"
+      try:
+        with open(interventions_file) as f:
+          items = json.load(f)
+      except (OSError, ValueError):
+        items = []
+      items += [{"persona": persona_name, "whisper": whisper}]
+      # Atomic replace so the backend never reads a half-written file.
+      tmp_file = interventions_file + ".tmp"
+      with open(tmp_file, "w") as f:
+        f.write(json.dumps(items, indent=2))
+      os.replace(tmp_file, interventions_file)
+      queued = True
+
+  context = {"sim_code": sim_code,
+             "persona_names": persona_names,
+             "queued": queued,
+             "error": error,
+             "token": supplied_token}
+  return render(request, "intervene/intervene.html", context)

@@ -69,3 +69,56 @@ class LLMSettingsPageTests(SimpleTestCase):
     self.assertEqual(self.client.get("/settings/").status_code, 403)
     self.assertEqual(
       self.client.get("/settings/?token=s3cret").status_code, 200)
+
+
+class IntervenePageTests(SimpleTestCase):
+  INTERVENTIONS_FILE = "temp_storage/interventions.json"
+
+  def setUp(self):
+    os.environ.pop("SETTINGS_TOKEN", None)
+    self._backup = None
+    if os.path.exists(self.INTERVENTIONS_FILE):
+      with open(self.INTERVENTIONS_FILE) as f:
+        self._backup = f.read()
+      os.remove(self.INTERVENTIONS_FILE)
+
+  def tearDown(self):
+    if os.path.exists(self.INTERVENTIONS_FILE):
+      os.remove(self.INTERVENTIONS_FILE)
+    if self._backup is not None:
+      with open(self.INTERVENTIONS_FILE, "w") as f:
+        f.write(self._backup)
+    os.environ.pop("SETTINGS_TOKEN", None)
+
+  def test_get_renders_form(self):
+    response = self.client.get("/intervene/")
+    self.assertEqual(response.status_code, 200)
+    self.assertContains(response, "Whisper")
+
+  def test_post_queues_whisper(self):
+    response = self.client.post("/intervene/", {
+      "persona": "Isabella Rodriguez",
+      "whisper": "You are planning a party tonight",
+    })
+    self.assertEqual(response.status_code, 200)
+    items = json.load(open(self.INTERVENTIONS_FILE))
+    self.assertEqual(items, [{"persona": "Isabella Rodriguez",
+                              "whisper": "You are planning a party tonight"}])
+
+  def test_post_appends_to_existing_queue(self):
+    self.client.post("/intervene/", {"persona": "A", "whisper": "one"})
+    self.client.post("/intervene/", {"persona": "B", "whisper": "two"})
+    items = json.load(open(self.INTERVENTIONS_FILE))
+    self.assertEqual(len(items), 2)
+    self.assertEqual(items[1]["persona"], "B")
+
+  def test_post_rejects_empty_fields(self):
+    response = self.client.post("/intervene/", {"persona": "", "whisper": ""})
+    self.assertContains(response, "required")
+    self.assertFalse(os.path.exists(self.INTERVENTIONS_FILE))
+
+  def test_token_protection(self):
+    os.environ["SETTINGS_TOKEN"] = "s3cret"
+    self.assertEqual(self.client.get("/intervene/").status_code, 403)
+    self.assertEqual(
+      self.client.get("/intervene/?token=s3cret").status_code, 200)

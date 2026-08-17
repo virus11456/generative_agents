@@ -3,12 +3,9 @@
 
 {% block content %}
 
-<!-- ══════════ Town dashboard: watch and control on one page ══════════ -->
-<div id="ville-nav" style="position:fixed; top:0; left:0; right:0; z-index:9998;
-     background:#1f2937; color:#fff; padding:.45em .8em; display:flex;
-     align-items:center; gap:.4em; font-family:sans-serif; font-size:14px;
-     box-shadow:0 2px 8px rgba(0,0,0,.35)">
-  <strong style="margin-right:.5em">🏘️ The Ville</strong>
+<!-- ══════════ 小鎮儀表板：一頁觀察 + 一頁調整 ══════════ -->
+<div id="ville-nav">
+  <strong style="margin-right:.5em; white-space:nowrap">🏘️ The Ville</strong>
   <button onclick="villeOpen('/settings/','⚙️ 設定')" class="ville-btn">⚙️ 設定</button>
   <button onclick="villeOpen('/events/','🗓️ 事件/選舉')" class="ville-btn">🗓️ 事件/選舉</button>
   <button onclick="villeOpen('/economy/','💰 經濟/關係')" class="ville-btn">💰 經濟/關係</button>
@@ -16,28 +13,130 @@
   <button onclick="villeOpen('/chronicle/','📰 日報')" class="ville-btn">📰 日報</button>
   <button onclick="villeOpen('/intervene/','💬 介入')" class="ville-btn">💬 介入</button>
   <span style="flex:1"></span>
-  <label style="font-size:12px; opacity:.8">token</label>
-  <input id="ville-token" type="password" placeholder="SETTINGS_TOKEN"
-         style="width:9em; padding:.25em .5em; border-radius:6px; border:0">
+  <label style="font-size:12px; opacity:.8; white-space:nowrap">token</label>
+  <input id="ville-token" type="password" placeholder="SETTINGS_TOKEN">
 </div>
-<style>
-  .ville-btn { background:#374151; color:#fff; border:0; border-radius:6px;
-               padding:.35em .8em; cursor:pointer; font-size:13px }
-  .ville-btn:hover { background:#4b5563 }
-  body { padding-top: 2.6em }
-</style>
-<div id="ville-drawer" style="display:none; position:fixed; top:2.55em; right:0;
-     bottom:0; width:min(560px,95vw); z-index:9999; background:#fff;
-     box-shadow:-4px 0 18px rgba(0,0,0,.3); flex-direction:column">
-  <div style="display:flex; align-items:center; padding:.5em .8em;
-       background:#111827; color:#fff; font-family:sans-serif">
+
+<div id="ville-drawer">
+  <div class="ville-drawer-head">
     <strong id="ville-drawer-title" style="flex:1"></strong>
     <button onclick="villeRefresh()" class="ville-btn" title="重新整理">⟳</button>
     <button onclick="document.getElementById('ville-drawer').style.display='none'"
             class="ville-btn" style="margin-left:.4em">✕ 關閉</button>
   </div>
-  <iframe id="ville-frame" style="flex:1; border:0; width:100%"></iframe>
+  <iframe id="ville-frame"></iframe>
 </div>
+
+<style>
+  body { padding-top: 3em; background: #f4f4f6;
+         font-family: -apple-system, "Segoe UI", "Noto Sans TC", Roboto,
+                      sans-serif; }
+  #ville-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 9998;
+               background: #1f2937; color: #fff; padding: .45em .8em;
+               display: flex; align-items: center; gap: .35em;
+               font-size: 14px; flex-wrap: wrap;
+               box-shadow: 0 2px 8px rgba(0,0,0,.35); }
+  .ville-btn { background: #374151; color: #fff; border: 0;
+               border-radius: 6px; padding: .35em .8em; cursor: pointer;
+               font-size: 13px; }
+  .ville-btn:hover { background: #4b5563; }
+  #ville-token { width: 9em; padding: .3em .6em; border-radius: 6px;
+                 border: 1px solid #4b5563; background: #111827;
+                 color: #fff; font-size: 13px; }
+  #ville-token::placeholder { color: #6b7280; }
+  #ville-drawer { display: none; position: fixed; top: 2.9em; right: 0;
+                  bottom: 0; width: min(560px, 96vw); z-index: 9999;
+                  background: #fff; flex-direction: column;
+                  box-shadow: -4px 0 18px rgba(0,0,0,.3); }
+  .ville-drawer-head { display: flex; align-items: center;
+                       padding: .5em .8em; background: #111827;
+                       color: #fff; }
+  #ville-frame { flex: 1; border: 0; width: 100%; }
+
+  /* ── 地圖：滿版、隨視窗縮放 ── */
+  .ville-map-card { max-width: 1520px; margin: 1em auto 0; padding: 0 1em; }
+  #game-container { border-radius: 12px; overflow: hidden;
+                    box-shadow: 0 4px 16px rgba(0,0,0,.15);
+                    background: #7ec850; }
+  #game-container canvas { width: 100% !important; height: auto !important;
+                           display: block; }
+
+  /* ── 時間列 ── */
+  .ville-time-bar { max-width: 1520px; margin: .8em auto; padding: .7em 1.2em;
+                    display: flex; align-items: center; gap: 1em;
+                    background: #fff; border-radius: 10px;
+                    box-shadow: 0 2px 8px rgba(0,0,0,.08);
+                    margin-left: auto; margin-right: auto;
+                    width: calc(100% - 2em); box-sizing: border-box; }
+  .ville-time-bar .label { color: #666; font-size: .95em;
+                           white-space: nowrap; }
+  #game-time-content { font-size: 1.35em; font-weight: 700; color: #111; }
+
+  /* ── 居民卡片網格（RWD）── */
+  .ville-residents { max-width: 1520px; margin: 0 auto 6em; padding: 0 1em;
+                     display: grid; gap: 12px;
+                     grid-template-columns: repeat(auto-fill,
+                                                   minmax(310px, 1fr)); }
+  .ville-card { background: #fff; border-radius: 12px; padding: 1em 1.2em;
+                box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+  .ville-card-head { display: flex; align-items: center; gap: .7em;
+                     margin-bottom: .5em; }
+  .ville-card-head img { width: 2.6em; height: 2.6em;
+                         image-rendering: pixelated; }
+  .ville-card-head h2 { font-size: 1.15em; margin: 0; font-weight: 700; }
+  .ville-card-head a { font-size: .78em; color: #2563eb;
+                       white-space: nowrap; }
+  .ville-card p { margin: .3em 0; font-size: .88em; color: #333;
+                  line-height: 1.5; }
+  .ville-card p strong { color: #6b7280; font-weight: 600;
+                         font-size: .92em; }
+  .ville-card span:empty::before { content: "（目前沒有）"; color: #bbb; }
+
+  @media (max-width: 640px) {
+    body { padding-top: 5.2em; }
+    .ville-residents { grid-template-columns: 1fr; }
+    #game-time-content { font-size: 1.05em; }
+  }
+</style>
+
+<!-- ── 地圖 ── -->
+<div class="ville-map-card">
+  <div id="game-container"></div>
+</div>
+
+<!-- ── 時間列 ── -->
+<div class="ville-time-bar">
+  <span class="label">🕐 目前時間</span>
+  <span id="game-time-content"></span>
+  <span style="flex:1"></span>
+  <span style="{% if mode == 'simulate' %} display:none {% endif %}">
+    <button id="play_button" type="button" class="ville-btn"
+            style="background:#059669">▶ 播放</button>
+    <button id="pause_button" type="button" class="ville-btn"
+            style="background:#b45309">⏸ 暫停</button>
+  </span>
+</div>
+
+<!-- ── 居民 ── -->
+<div class="ville-residents">
+  {% for p_name, p_name_os in persona_names %}
+  <div class="ville-card">
+    <div class="ville-card-head">
+      <img src="{% static 'img/atlas.png' %}" alt="">
+      <h2 id="name__{{ p_name_os }}" style="flex:1">{{ p_name }}</h2>
+      <a href="{% url 'replay_persona_state' sim_code step p_name_os %}"
+         target="_blank">查看詳情</a>
+    </div>
+    <p><strong>目前行動</strong><br>
+       <span id="current_action__{{ p_name_os }}"></span></p>
+    <p><strong>所在位置</strong><br>
+       <span id="target_address__{{ p_name_os }}"></span></p>
+    <p><strong>目前對話</strong><br>
+       <span id="chat__{{ p_name_os }}"></span></p>
+  </div>
+  {% endfor %}
+</div>
+
 <script>
   (function(){
     var saved = localStorage.getItem('ville_token') || '';
@@ -56,80 +155,8 @@
     frame.src = frame.src;
   }
 </script>
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-
-<br>
-<br>
-<div>
-	<div id="game-container" style="text-align: center"></div>
-
-	<div style="width:55%; margin: 0 auto; margin-top:4.5em">
-		<h3 style="margin-bottom:-0.5em; font-size:1.5em">Current Time:</h3>
-		<div class="row">
-			<div class="col-md-8" id="game-time" style="">
-				<h2><span id="game-time-content"></span></h2> 
-			</div>
-			<div class="col-md-4">
-				
-				<h2 style="text-align: right; {% if mode == 'simulate' %} display: none {% endif %}">
-					<button id="play_button" type="button" class="btn btn-default">
-				    <strong style=" font-size:1.2em"><i class="glyphicon glyphicon-play"></i> &nbsp;Play</strong>
-				  </button>
-				  
-				  <button id="pause_button" type="button" class="btn btn-default">
-				    <strong style=" font-size:1.2em"><i class="glyphicon glyphicon-pause"></i> &nbsp;Pause</strong>
-				  </button>
-
-				</h2>
-				
-			</div>
-		</div>
-
-		<br>
-		<hr style="border-color:#999999">
-		<br>
-
-		{% for p_name, p_name_os in persona_names %}
-			<div class="media" style="background-color:#EEEEEE; padding:1em; padding-left:3.5em; padding-right:2em; border-radius:10px">
-			  <div class="media-left media-middle">
-			    <a href="#">
-			      <img class="media-object" src="{% static 'img/atlas.png' %}" style="width:5em">
-			    </a>
-			  </div>
-			  <div class="media-body" style='padding-left:3em; padding-top:0.5em; padding-bottom:1em'>
-			  	<div class="row">
-			    	<h2 class="col-md-8" id="name__{{ p_name_os }}" style="margin-bottom:0.8em; font-size:1.85em; ">
-			    		{{p_name}} &nbsp;&nbsp;
-			    		<a href="{% url 'replay_persona_state' sim_code step p_name_os %}" style="font-size:0.6em">State Details</a>
-			    	</h2>
-			    </div>
-			    <div style="">
-					  <p style="font-size:1.2em"><strong>Current Action:</strong> <br><span id="current_action__{{ p_name_os }}"></span></p>
-					  <p style="font-size:1.2em"><strong>Location:</strong> <br><span id="target_address__{{ p_name_os }}"></span></p>
-					  <p style="font-size:1.2em"><strong>Current Conversation:</strong> <br><span id="chat__{{ p_name_os }}"></span></p>
-					</div>
-			  </div>
-			</div>	
-			<br>
-		{% endfor %}
-
-
-
-
-		
-
-	</div>
-</div>
-
-  
-
-
-
-<div style="padding-bottom:15em"> </div>
-
 
 <!-- partial -->
 <script src='https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.js'></script>
 {% include 'home/main_script.html' %}
 {% endblock content %}
-

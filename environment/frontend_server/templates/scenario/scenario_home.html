@@ -1,10 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-Hant">
 <head>
   <meta charset="UTF-8">
-  <title>Scenario Editor</title>
+  <title>劇本編輯器</title>
   <style>
-    body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    body { font-family: -apple-system, "Segoe UI", "Noto Sans TC", Roboto,
+           sans-serif;
            background: #f4f4f6; margin: 0; padding: 2rem; color: #222; }
     .card { max-width: 720px; margin: 0 auto 1.5rem; background: #fff;
             border-radius: 10px; padding: 2rem;
@@ -34,7 +35,7 @@
 </head>
 <body>
 <div class="card">
-  <h1>Scenario Editor</h1>
+  <h1>🎭 劇本編輯器</h1>
 
   {% if error %}
   <div class="err">{{ error }}{% if output %}
@@ -42,36 +43,36 @@
 {{ output }}{% endif %}</div>
   {% endif %}
 
-  <h2>Generate a new scenario</h2>
+  <h2>生成新劇本</h2>
   <form method="post" onsubmit="document.getElementById('spinner').style.display='block'">{% csrf_token %}
     <input type="hidden" name="token" value="{{ token }}">
 
-    <label for="fork">Base simulation</label>
+    <label for="fork">基底模擬</label>
     <select id="fork" name="fork">
       {% for sim in sims %}
       <option value="{{ sim }}" {% if sim == "base_the_ville_isabella_maria_klaus" %}selected{% endif %}>{{ sim }}</option>
       {% endfor %}
     </select>
-    <div class="hint">base_the_ville_isabella_maria_klaus = 3 personas;
-      base_the_ville_n25 = 25 personas.</div>
+    <div class="hint">base_the_ville_isabella_maria_klaus＝3 位居民；
+      base_the_ville_n25＝25 位居民。</div>
 
-    <label for="name">New scenario name</label>
-    <input id="name" name="name" placeholder="e.g. startup_drama"
+    <label for="name">新劇本名稱</label>
+    <input id="name" name="name" placeholder="例如：startup_drama"
            pattern="[A-Za-z0-9_-]+">
-    <div class="hint">Letters, digits, '-' and '_' only.</div>
+    <div class="hint">只能使用英文字母、數字、「-」與「_」。</div>
 
-    <label for="story">Story premise (any language)</label>
+    <label for="story">故事前提（任何語言都可以）</label>
     <textarea id="story" name="story"
-      placeholder="e.g. 三個室友：一人偷偷計畫創業想挖另外兩人入夥，一人正準備出國留學，一人剛失業還瞞著大家"></textarea>
+      placeholder="例如：三個室友：一人偷偷計畫創業想挖另外兩人入夥，一人正準備出國留學，一人剛失業還瞞著大家"></textarea>
 
-    <button type="submit">Generate scenario</button>
-    <div id="spinner">Generating (one LLM call per persona -- this can take
-      a minute or several for 25 personas)... keep this tab open.</div>
+    <button type="submit">生成劇本</button>
+    <div id="spinner">生成中（每位居民一次 LLM 呼叫——3 位居民約一分鐘，
+      25 位居民要好幾分鐘）…… 請保持此分頁開啟。</div>
   </form>
 </div>
 
 <div class="card">
-  <h2>Edit an existing simulation</h2>
+  <h2>編輯現有模擬</h2>
   {% if sims %}
   <ul>
     {% for sim in sims %}
@@ -79,7 +80,7 @@
     {% endfor %}
   </ul>
   {% else %}
-  <p class="hint">No simulations found in storage.</p>
+  <p class="hint">storage 目錄中找不到任何模擬。</p>
   {% endif %}
 </div>
 </body>

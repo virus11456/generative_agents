@@ -453,7 +453,7 @@ def intervene(request):
     persona_name = request.POST.get("persona", "").strip()
     whisper = request.POST.get("whisper", "").strip()
     if not persona_name or not whisper:
-      error = "Both a persona and a whisper are required."
+      error = "居民與耳語內容都必須填寫。"
     else:
       # One file per whisper: no read-modify-write, so the backend
       # (which consumes and deletes files) can never race with us.
@@ -501,15 +501,15 @@ def _token_forbidden(request):
   if required_token:
     if supplied_token != required_token:
       return HttpResponse(
-        "Forbidden: this page is protected. Append ?token=<SETTINGS_TOKEN> "
-        "to the URL.", status=403), supplied_token
+        "拒絕存取：此頁面受保護。請在網址加上 ?token=<SETTINGS_TOKEN>。",
+        status=403), supplied_token
     return None, supplied_token
   remote_addr = request.META.get("REMOTE_ADDR", "")
   if remote_addr not in ("127.0.0.1", "::1"):
     return HttpResponse(
-      "Forbidden: admin pages are localhost-only until you set the "
-      "SETTINGS_TOKEN environment variable (then open this page with "
-      "?token=<value>).", status=403), supplied_token
+      "拒絕存取：在設定 SETTINGS_TOKEN 環境變數之前，管理頁面只允許"
+      "從本機（localhost）開啟；設定後請以 ?token=<值> 開啟本頁。",
+      status=403), supplied_token
   return None, supplied_token
 
 
@@ -545,14 +545,13 @@ def scenario_home(request):
     name = request.POST.get("name", "").strip()
     story = request.POST.get("story", "").strip()
     if not _re.fullmatch(r"[A-Za-z0-9_-]+", name or ""):
-      error = ("Scenario name must contain only letters, digits, '-' "
-               "and '_'.")
+      error = "劇本名稱只能使用英文字母、數字、「-」與「_」。"
     elif fork not in _list_sims():
-      error = "Unknown base simulation."
+      error = "找不到這個基底模擬。"
     elif name in _list_sims():
-      error = f"A simulation named '{name}' already exists."
+      error = f"已經有名為「{name}」的模擬了。"
     elif not story:
-      error = "A story premise is required."
+      error = "請填寫故事前提。"
     else:
       # scenario_generator.py lives in the backend and uses backend-relative
       # paths, so it runs as a subprocess with the backend as cwd. This can
@@ -565,16 +564,15 @@ def scenario_home(request):
           cwd=_BACKEND_DIR, capture_output=True, text=True, timeout=570)
       except subprocess.TimeoutExpired:
         result = None
-        error = ("Generation timed out. For large casts (e.g. the "
-                 "25-persona base), run scenario_generator.py from the "
-                 "command line instead.")
+        error = ("生成逾時。若居民較多（例如 25 人的基底），請改在"
+                 "命令列執行 scenario_generator.py。")
       if result is not None:
         if result.returncode == 0:
           url = f"/scenario/{name}/"
           if token:
             url += f"?token={token}"
           return HttpResponseRedirect(url)
-        error = "Generation failed."
+        error = "生成失敗。"
         output = (result.stdout or "") + "\n" + (result.stderr or "")
 
   context = {"sims": _list_sims(),
@@ -596,7 +594,7 @@ def scenario_edit(request, sim_code):
 
   meta_file = f"storage/{sim_code}/reverie/meta.json"
   if not os.path.isfile(meta_file):
-    return HttpResponse(f"Unknown simulation: {sim_code}", status=404)
+    return HttpResponse(f"找不到模擬：{sim_code}", status=404)
   with open(meta_file) as f:
     persona_names = json.load(f)["persona_names"]
 
@@ -703,19 +701,19 @@ def events_page(request):
           target = [t.strip() for t in target.split(";") if t.strip()]
         spec["target"] = target
         if not spec["text"]:
-          error = "Broadcast events need a whisper text."
+          error = "廣播事件必須填寫耳語內容。"
       elif event_type == "election":
         candidates = request.POST.get("candidates", "random").strip()
         if candidates.lower() != "random":
           candidates = [c.strip() for c in candidates.split(";")
                         if c.strip()]
           if len(candidates) < 2:
-            error = "Elections need 'random' or at least two candidates."
+            error = "選舉的候選人必須是「random」或至少兩位。"
         spec["candidates"] = candidates
         spec["campaign_days"] = request.POST.get("campaign_days",
                                                  "1").strip() or "1"
       else:
-        error = "Unknown event type."
+        error = "未知的事件類型。"
       if not error:
         _queue_event_command({"action": "add", "spec": spec})
         queued = True

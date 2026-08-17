@@ -1,10 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-Hant">
 <head>
   <meta charset="UTF-8">
-  <title>World Events</title>
+  <title>世界事件</title>
   <style>
-    body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    body { font-family: -apple-system, "Segoe UI", "Noto Sans TC", Roboto,
+           sans-serif;
            background: #f4f4f6; margin: 0; padding: 2rem; color: #222; }
     .card { max-width: 760px; margin: 0 auto 1.5rem; background: #fff;
             border-radius: 10px; padding: 2rem;
@@ -49,120 +50,119 @@
 </head>
 <body>
 <div class="card">
-  <h1>World Events</h1>
+  <h1>🗓️ 世界事件</h1>
 
   {% if queued %}
-  <div class="ok">Command queued. The simulation backend applies it between
-    steps -- it must be running (<code>run &lt;count&gt;</code>).</div>
+  <div class="ok">指令已排入佇列。模擬後端會在步驟之間套用——後端必須正在
+    運行（<code>run &lt;步數&gt;</code>）。</div>
   {% endif %}
   {% if error %}
   <div class="err">{{ error }}</div>
   {% endif %}
 
-  <h2>Schedule an event</h2>
-  <div class="hint">Quick presets:</div>
+  <h2>排定事件</h2>
+  <div class="hint">快速範本：</div>
   <div>
-    <button type="button" class="preset" onclick="preset('election7')">🗳️ Recurring election (every 7 days)</button>
-    <button type="button" class="preset" onclick="preset('election1')">🗳️ Election tomorrow</button>
-    <button type="button" class="preset" onclick="preset('market')">🧺 Weekly market</button>
-    <button type="button" class="preset" onclick="preset('party')">🎉 Party tonight</button>
-    <button type="button" class="preset" onclick="preset('rumor')">🤫 Plant a rumor</button>
+    <button type="button" class="preset" onclick="preset('election7')">🗳️ 定期選舉（每 7 天）</button>
+    <button type="button" class="preset" onclick="preset('election1')">🗳️ 明天選舉</button>
+    <button type="button" class="preset" onclick="preset('market')">🧺 每週市集</button>
+    <button type="button" class="preset" onclick="preset('party')">🎉 今晚派對</button>
+    <button type="button" class="preset" onclick="preset('rumor')">🤫 散播謠言</button>
   </div>
 
   <form method="post">{% csrf_token %}
     <input type="hidden" name="token" value="{{ token }}">
     <input type="hidden" name="action" value="add">
 
-    <label for="type">Event type</label>
+    <label for="type">事件類型</label>
     <select id="type" name="type" onchange="toggleType()">
-      <option value="election">Election (announce &rarr; campaign &rarr; vote &rarr; results)</option>
-      <option value="broadcast">Broadcast (festival / news / rumor / custom whisper)</option>
+      <option value="election">選舉（公告 &rarr; 造勢 &rarr; 投票 &rarr; 開票）</option>
+      <option value="broadcast">廣播（節慶／新聞／謠言／自訂耳語）</option>
     </select>
 
-    <label for="label">Label</label>
-    <input id="label" name="label" placeholder="e.g. mayoral election">
+    <label for="label">名稱</label>
+    <input id="label" name="label" placeholder="例如：鎮長選舉">
 
     <div id="election_fields">
-      <label for="candidates">Candidates</label>
+      <label for="candidates">候選人</label>
       <input id="candidates" name="candidates" value="random"
-             placeholder='random, or "Sam Moore; Tom Moreno"'>
-      <div class="hint">"random" picks two random residents each cycle.</div>
+             placeholder='random，或 "Sam Moore; Tom Moreno"'>
+      <div class="hint">「random」＝每輪隨機抽兩位居民參選。</div>
 
-      <label for="campaign_days">Campaign length (game days)</label>
+      <label for="campaign_days">造勢期長度（遊戲日）</label>
       <input id="campaign_days" name="campaign_days" type="number"
              step="0.5" min="0.5" value="2">
-      <div class="hint">Time between the announcement and the vote, during
-        which the town discusses the election.</div>
+      <div class="hint">從公告到投票之間的時間；期間全鎮會討論這場選舉。</div>
     </div>
 
     <div id="broadcast_fields" style="display:none">
-      <label for="text">Whisper text (addressed to each agent as "you")</label>
+      <label for="text">耳語內容（以「你」稱呼每位居民）</label>
       <textarea id="text" name="text"
-        placeholder="e.g. There is a big market in the plaza today and you want to check it out"></textarea>
+        placeholder="例如：There is a big market in the plaza today and you want to check it out（建議用英文，居民的記憶是英文的）"></textarea>
 
-      <label for="target">Recipients</label>
+      <label for="target">接收對象</label>
       <input id="target" name="target" value="all"
-             placeholder='all, random:3, or "Isabella Rodriguez; Klaus Mueller"'>
+             placeholder='all、random:3，或 "Isabella Rodriguez; Klaus Mueller"'>
     </div>
 
-    <label for="days_from_now">Starts in (game days from now)</label>
+    <label for="days_from_now">幾個遊戲日後開始</label>
     <input id="days_from_now" name="days_from_now" type="number" step="0.1"
            min="0" value="0">
-    <div class="hint">0 = on the next simulation step.</div>
+    <div class="hint">0＝下一個模擬步驟就發生。</div>
 
-    <label for="every_days">Repeat every (game days)</label>
+    <label for="every_days">重複週期（遊戲日）</label>
     <input id="every_days" name="every_days" type="number" step="0.5"
            min="0" value="0">
-    <div class="hint">0 = one-shot event.</div>
+    <div class="hint">0＝只發生一次。</div>
 
-    <button type="submit" class="primary">Schedule event</button>
+    <button type="submit" class="primary">排定事件</button>
   </form>
 </div>
 
 <div class="card">
-  <h2>Scheduled events &amp; history{% if sim_code %} -- {{ sim_code }}{% endif %}</h2>
+  <h2>已排定事件與歷史{% if sim_code %}——{{ sim_code }}{% endif %}</h2>
   {% if not events %}
-  <p class="hint">No events scheduled{% if not sim_code %} (no running
-    simulation detected){% endif %}.</p>
+  <p class="hint">目前沒有排定的事件{% if not sim_code %}（未偵測到運行中的
+    模擬）{% endif %}。</p>
   {% endif %}
   {% for e in events %}
   <div class="event">
-    <strong>#{{ e.id }} {{ e.label }}</strong> ({{ e.type }})
+    <strong>#{{ e.id }} {{ e.label }}</strong>（{{ e.type }}）
     <form method="post" style="display:inline; float:right">{% csrf_token %}
       <input type="hidden" name="token" value="{{ token }}">
       <input type="hidden" name="action" value="remove">
       <input type="hidden" name="id" value="{{ e.id }}">
-      <button type="submit" class="small">Cancel</button>
+      <button type="submit" class="small">取消</button>
     </form>
     <div class="meta">
-      Next: {{ e.fire_at }}{% if e.every_days %} &middot; repeats every
-      {{ e.every_days }} game days{% endif %}
-      {% if e.type == "election" %} &middot; phase: {{ e.phase }}
-      {% if e.resolved_candidates %} &middot; candidates:
+      下次觸發：{{ e.fire_at }}{% if e.every_days %} &middot; 每
+      {{ e.every_days }} 個遊戲日重複{% endif %}
+      {% if e.type == "election" %} &middot; 階段：{{ e.phase }}
+      {% if e.resolved_candidates %} &middot; 候選人：
       {{ e.resolved_candidates|join:", " }}{% endif %}{% endif %}
     </div>
     {% for h in e.history reversed %}
     <details {% if forloop.first %}open{% endif %}>
-      <summary>{{ h.at }}{% if h.winners %} -- winner:
+      <summary>{{ h.at }}{% if h.winners %}——當選：
         {{ h.winners|join:" & " }}{% endif %}</summary>
       {% if h.counts %}
       <table>
-        <tr><th>Candidate</th><th>Votes</th></tr>
+        <tr><th>候選人</th><th>得票</th></tr>
         {% for cand, n in h.counts.items %}
         <tr><td {% if cand in h.winners %}class="winner"{% endif %}>{{ cand }}</td><td>{{ n }}</td></tr>
         {% endfor %}
       </table>
       <details>
-        <summary>Individual votes &amp; reasons</summary>
+        <summary>個別選票與理由</summary>
         <table>
-          <tr><th>Voter</th><th>Vote</th><th>Reason</th></tr>
+          <tr><th>投票人</th><th>投給</th><th>理由</th></tr>
           {% for voter, v in h.votes.items %}
-          <tr><td>{{ voter }}</td><td>{{ v.vote|default:"(abstain)" }}</td><td>{{ v.reason }}</td></tr>
+          <tr><td>{{ voter }}</td><td>{{ v.vote|default:"（棄權）" }}</td><td>{{ v.reason }}</td></tr>
           {% endfor %}
         </table>
       </details>
       {% elif h.targets %}
-      <div class="meta">Delivered to: {{ h.targets|join:", " }}</div>
+      <div class="meta">已傳達給：{{ h.targets|join:", " }}</div>
       {% endif %}
     </details>
     {% endfor %}

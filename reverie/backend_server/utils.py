@@ -98,6 +98,15 @@ key_owner = os.environ.get("KEY_OWNER", "Anonymous")
 # These performance knobs can also be set on the /settings web page.
 cost_limit_usd = _cfg_num("cost_limit_usd", "COST_LIMIT_USD", 0.0)
 
+# Personality traits & relationships: auto-draw a hand of traits and a
+# relationship web for every persona when a brand-new simulation is created.
+traits_auto = _cfg_bool("traits_auto", "TRAITS_AUTO", True)
+# Economy: wallets, daily wages, venue spending, conversation trades.
+economy_enabled = _cfg_bool("economy", "ECONOMY", True)
+econ_starting_balance = _cfg_num("econ_starting_balance",
+                                 "ECONOMY_STARTING_BALANCE", 100.0)
+econ_daily_wage = _cfg_num("econ_daily_wage", "ECONOMY_DAILY_WAGE", 80.0)
+
 # Headless mode: the backend advances the world without a browser tab by
 # writing the environment files itself. Open simulator_home anytime to watch.
 headless_mode = _cfg_bool("headless", "HEADLESS", False)

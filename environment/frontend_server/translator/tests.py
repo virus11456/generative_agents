@@ -276,6 +276,46 @@ class ChroniclePageTests(SimpleTestCase):
       self.client.get("/chronicle/?token=s3cret").status_code, 200)
 
 
+class EconomyPageTests(SimpleTestCase):
+  SIM = "test_eco_sim"
+
+  def setUp(self):
+    os.environ.pop("SETTINGS_TOKEN", None)
+    os.makedirs(f"storage/{self.SIM}/reverie", exist_ok=True)
+    with open(f"storage/{self.SIM}/reverie/meta.json", "w") as f:
+      json.dump({"persona_names": ["Kim Tester"]}, f)
+    with open(f"storage/{self.SIM}/reverie/economy.json", "w") as f:
+      json.dump({"balances": {"Kim Tester": 77.5},
+                 "transactions": [{"at": "February 13, 2023, 12:00:00",
+                                   "type": "trade", "from": "Kim Tester",
+                                   "to": "Bo", "amount": 5,
+                                   "note": "lent a fiver"}]}, f)
+    with open(f"storage/{self.SIM}/reverie/traits.json", "w") as f:
+      json.dump({"Kim Tester": ["generous", "night_owl"]}, f)
+    with open(f"storage/{self.SIM}/reverie/relationships.json", "w") as f:
+      json.dump([{"type": "crush", "a": "Kim Tester", "b": "Bo"}], f)
+
+  def tearDown(self):
+    import shutil
+    shutil.rmtree(f"storage/{self.SIM}", ignore_errors=True)
+    os.environ.pop("SETTINGS_TOKEN", None)
+
+  def test_renders_wallets_traits_relationships_ledger(self):
+    response = self.client.get(f"/economy/?sim={self.SIM}")
+    self.assertEqual(response.status_code, 200)
+    self.assertContains(response, "Kim Tester")
+    self.assertContains(response, "77.5")
+    self.assertContains(response, "慷慨")       # trait shown in Chinese
+    self.assertContains(response, "暗戀")       # crush chip
+    self.assertContains(response, "lent a fiver")
+
+  def test_token_protection(self):
+    os.environ["SETTINGS_TOKEN"] = "s3cret"
+    self.assertEqual(self.client.get("/economy/").status_code, 403)
+    self.assertEqual(
+      self.client.get("/economy/?token=s3cret").status_code, 200)
+
+
 class IntervenePageTests(SimpleTestCase):
   INTERVENTIONS_DIR = "temp_storage/interventions"
 

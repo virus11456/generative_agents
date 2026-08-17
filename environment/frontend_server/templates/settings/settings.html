@@ -140,6 +140,33 @@
              placeholder="Traditional Chinese (繁體中文)">
     </div>
 
+    <div class="section">
+      <strong>Traits &amp; economy</strong>
+
+      <label for="traits_auto">Personality traits &amp; relationships
+        (auto-drawn for new sims)</label>
+      <select id="traits_auto" name="traits_auto">
+        <option value="1" {% if cfg.traits_auto != "0" %}selected{% endif %}>On</option>
+        <option value="0" {% if cfg.traits_auto == "0" %}selected{% endif %}>Off</option>
+      </select>
+
+      <label for="economy">Economy (wallets, wages, spending, trades)</label>
+      <select id="economy" name="economy">
+        <option value="1" {% if cfg.economy != "0" %}selected{% endif %}>On</option>
+        <option value="0" {% if cfg.economy == "0" %}selected{% endif %}>Off</option>
+      </select>
+
+      <label for="econ_starting_balance">Starting balance ($)</label>
+      <input id="econ_starting_balance" name="econ_starting_balance"
+             type="number" step="1" min="0"
+             value="{{ cfg.econ_starting_balance }}" placeholder="100">
+
+      <label for="econ_daily_wage">Daily wage ($)</label>
+      <input id="econ_daily_wage" name="econ_daily_wage" type="number"
+             step="1" min="0" value="{{ cfg.econ_daily_wage }}"
+             placeholder="80">
+    </div>
+
     <button type="submit">Save</button>
   </form>
 

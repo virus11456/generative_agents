@@ -32,6 +32,9 @@ This repository accompanies our research paper titled "[Generative Agents: Inter
 | 劇本產生器 + 網頁編輯器 | 一句話的故事設定（中英文皆可）→ 自動生成所有角色的人設、目標、人際關係；`/scenario/` 頁面可直接在瀏覽器生成與逐欄編輯 |
 | 世界事件系統 | **定期選舉**（公告→競選→全鎮投票→開票→反應）、節慶市集、派對、八卦傳播、自訂事件——用遊戲內時間排程、可循環發生，`/events/` 頁面一鍵排程並查看開票結果 |
 | 24/7 掛機模式 | Headless 無頭運行——不需要開瀏覽器，小鎮在 VPS 上自己過日子；你隨時打開 `simulator_home` 就能看到他們正在生活 |
+| 個性詞條系統 | 100 條正面/負面/怪癖詞條，新模擬建立時每人自動抽卡（稀有度加權、衝突互斥），影響對話、社交、選舉、消費等所有行為 |
+| 關係網 | 自動生成情侶、暗戀（單向、只有本人知道）、手足、摯友、死對頭，種進記憶並登記成結構化資料 |
+| 經濟系統 | 每人有錢包，每日領薪、去店家消費自動扣款、對話中的交易由 LLM 依雙方詞條判定（慷慨的請客、吝嗇的分帳）、缺錢會焦慮，`/economy/` 頁面看排行與流水帳 |
 | 小鎮日報 | 每個遊戲日結束自動把當天所有行動與對話寫成一份**中文報紙**，`/chronicle/` 頁面閱讀——離開幾天回來，從日報補劇情 |
 
 ## 快速開始
@@ -181,6 +184,28 @@ event list                                # 查看所有排程事件
 | 🤫 八卦 | 只告訴隨機 3 個人一條流言（「聽說有人中了樂透還瞞著大家」），觀察流言如何傳播變形 |
 | 自訂 | 任何文字、任何對象（全鎮 / 隨機 K 人 / 指定名單）、任何時間、可循環 |
 
+## 個性詞條、關係網與經濟系統
+
+### 個性詞條（100 條）
+`reverie/backend_server/traits.json` 內建 100 條詞條——40 正面（慷慨、誠實、勇敢…）、40 負面（吝嗇、記仇、八卦、揮霍…）、20 怪癖（夜貓子、迷信、咖啡因成癮…），每條都帶中文名稱、行為指令和衝突表（慷慨和吝嗇不會同時出現）。
+
+**新模擬建立時自動抽卡**：每人抽 2 正 + 1 負 + 1 怪癖（稀有度加權）。詞條會：
+1. 寫進 `innate`（天性）欄位——自動影響**所有** prompt：日程、對話、社交決策、選舉投票
+2. 以耳語形式種進記憶流——agent「記得」自己是這樣的人
+
+指令：`traits show` 查看全鎮詞條與關係、`traits assign` 為舊模擬補抽；`/settings/` 可關閉自動抽卡。詞條庫是 JSON，想自己加詞條直接編輯即可。
+
+### 關係網
+新模擬同時自動生成結構化關係：**情侶**（互相知道）、**暗戀**（單向——只有暗戀方自己知道，等著看劇情發酵）、**手足**（只在同姓之間）、**摯友**、**死對頭**。同姓居民永遠不會被配成情侶。關係存在 `relationships.json`，也種進雙方（或單方）記憶。
+
+### 經濟系統
+每個居民有錢包（預設 $100 起始、每日薪資 $80，`/settings/` 可調）：
+
+* **消費**：在店家做「消費類行動」（在 Hobbs Cafe 喝咖啡 $8、酒吧 $12、超市採買 $15…）自動扣款——純字串比對，零 LLM 成本；在店裡「工作」不扣款
+* **人際交易**：每場對話結束後由 LLM 判定「有沒有錢易手」——判定時餵入**雙方的詞條和餘額**，慷慨的人會請客、愛佔便宜的會借錢不還、吝嗇的堅持分帳；成立的交易即時轉帳、記帳、雙方都獲得記憶
+* **貧困迴路**：餘額低於 $10 自動植入「你手頭很緊」的焦慮記憶，影響後續行為；回升後解除
+* **查看**：`/economy/` 頁面有錢包排行（含每人詞條）、關係網圖釘、交易流水帳；CLI 輸入 `economy`；日報也會有財經版（當日交易 + 收盤錢包排行）
+
 ## 24/7 掛機模式與小鎮日報
 
 **重要觀念**：小鎮的時間不會自己流動——只有你下 `run` 指令、且（原版設計裡）瀏覽器分頁開著，世界才會前進。這兩個功能合起來，讓小鎮變成一個「你不觀測也持續生活」的世界：
@@ -299,6 +324,8 @@ This fork modernizes the original codebase so it runs today:
 * **World events** — a game-clock event engine with recurring **mayoral elections** (announce → emergent campaigning → every agent votes individually based on its own memories → personalized results trigger reactions), plus broadcast events (festivals, parties, rumors to random subsets, custom whispers), schedulable from the `/events/` page or `election ...` CLI commands; election history with per-agent votes and reasons is browsable on the page.
 * **24/7 headless mode** — `headless on` + `run forever` (or `docker compose --profile autorun up -d`) advances the world with no browser attached; open `simulator_home` anytime to watch the town live. `REVERIE_FORK_SIM`/`REVERIE_NEW_SIM`/`REVERIE_AUTORUN` enable fully non-interactive startup.
 * **The Ville Chronicle** — at every game-day boundary the backend compresses the day's full activity log (every action and verbatim conversation, plus election results) and has the LLM write a daily newspaper (language configurable, default Traditional Chinese); browse issues at `/chronicle/`, or force one with `chronicle now`.
+* **Personality traits & relationships** — a 100-entry trait library (positive/negative/quirk, rarity-weighted, conflict-aware); every new simulation auto-draws a hand per persona, appending trait words to `innate` (flowing into every prompt) and whispering each trait's behavior into memory. A relationship web (couples, one-way secret crushes, siblings, best friends, rivals — never romance within a family) is generated, registered, and whispered alongside. `traits show`/`traits assign` CLI.
+* **Economy** — wallets with daily wages, deterministic venue spending (consumption verbs at known venues; working is free), LLM-adjudicated conversation trades fed both parties' traits and balances, and a poverty loop that plants money-anxiety whispers below a threshold. Browse balances (with traits), the relationship web, and the full ledger at `/economy/`; the daily chronicle gains an economy section.
 * **Cost ceiling** — set `COST_LIMIT_USD` to auto-save and halt the simulation when the estimated spend reaches your budget (warning at 80%).
 * **Docker deployment** — `docker compose up -d` for the web server and `docker compose run --rm backend` for the interactive simulation; state persists via bind mounts.
 

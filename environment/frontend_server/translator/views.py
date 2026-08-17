@@ -336,7 +336,9 @@ _LLM_CONFIG_FIELDS = ["provider", "base_url", "chat_model",
                       "embedding_model",
                       "cost_limit_usd", "llm_cache", "parallel_personas",
                       "checkpoint_freq",
-                      "headless", "chronicle", "chronicle_lang"]
+                      "headless", "chronicle", "chronicle_lang",
+                      "traits_auto", "economy", "econ_starting_balance",
+                      "econ_daily_wage"]
 _LLM_SECRET_FIELDS = ["api_key", "embedding_api_key"]
 
 
@@ -763,3 +765,65 @@ def chronicle_page(request):
              "article": article,
              "token": token}
   return render(request, "chronicle/chronicle.html", context)
+
+
+# ============================================================================
+# Economy & social fabric page
+# ============================================================================
+
+def economy_page(request):
+  """
+  Town dashboard for the current (or ?sim=) simulation: wallets ranked by
+  balance with each persona's personality traits, the relationship web,
+  and the transaction ledger.
+  """
+  forbidden, token = _token_forbidden(request)
+  if forbidden:
+    return forbidden
+
+  sim_code = request.GET.get("sim", "").strip()
+  if sim_code and not _re.fullmatch(r"[\w-]+", sim_code):
+    sim_code = ""
+  if not sim_code:
+    sim_code, _ = _current_sim_personas()
+
+  def _read_json(path, default):
+    try:
+      with open(path) as f:
+        return json.load(f)
+    except (OSError, ValueError):
+      return default
+
+  economy = {}
+  traits_registry = {}
+  relationships = []
+  trait_names = {}
+  if sim_code:
+    economy = _read_json(f"storage/{sim_code}/reverie/economy.json", {})
+    traits_registry = _read_json(
+      f"storage/{sim_code}/reverie/traits.json", {})
+    relationships = _read_json(
+      f"storage/{sim_code}/reverie/relationships.json", [])
+    library = _read_json(os.path.join(
+      os.path.dirname(os.path.abspath(__file__)), "..", "..", "..",
+      "reverie", "backend_server", "traits.json"), {})
+    trait_names = {t["id"]: t["name_zh"]
+                   for t in library.get("traits", [])}
+
+  wallets = []
+  balances = economy.get("balances", {})
+  for name in sorted(balances, key=lambda n: -balances[n]):
+    trait_labels = [f"{trait_names.get(t, t)}"
+                    for t in traits_registry.get(name, [])]
+    wallets += [{"name": name, "balance": balances[name],
+                 "traits": ", ".join(trait_labels)}]
+
+  transactions = list(reversed(economy.get("transactions", [])))[:100]
+
+  context = {"sim_code": sim_code,
+             "sims": _list_sims(),
+             "wallets": wallets,
+             "relationships": relationships,
+             "transactions": transactions,
+             "token": token}
+  return render(request, "economy/economy.html", context)

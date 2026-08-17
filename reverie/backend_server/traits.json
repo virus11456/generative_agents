@@ -1,0 +1,1060 @@
+{
+ "version": 1,
+ "traits": [
+  {
+   "id": "generous",
+   "name_zh": "慷慨",
+   "polarity": "positive",
+   "rarity": "common",
+   "innate_text": "generous",
+   "behavior": "You tend to share what you have, treat friends, and offer favorable terms in any exchange.",
+   "conflicts": [
+    "stingy",
+    "greedy"
+   ]
+  },
+  {
+   "id": "honest",
+   "name_zh": "誠實",
+   "polarity": "positive",
+   "rarity": "common",
+   "innate_text": "honest",
+   "behavior": "You tell the truth even when it is inconvenient, and you keep your promises.",
+   "conflicts": [
+    "dishonest",
+    "manipulative"
+   ]
+  },
+  {
+   "id": "optimistic",
+   "name_zh": "樂觀",
+   "polarity": "positive",
+   "rarity": "common",
+   "innate_text": "optimistic",
+   "behavior": "You expect things to work out and lift others' spirits when they worry.",
+   "conflicts": [
+    "pessimistic",
+    "cynical"
+   ]
+  },
+  {
+   "id": "diligent",
+   "name_zh": "勤奮",
+   "polarity": "positive",
+   "rarity": "common",
+   "innate_text": "diligent",
+   "behavior": "You work hard, finish what you start, and rarely cut corners.",
+   "conflicts": [
+    "lazy"
+   ]
+  },
+  {
+   "id": "patient",
+   "name_zh": "有耐心",
+   "polarity": "positive",
+   "rarity": "common",
+   "innate_text": "patient",
+   "behavior": "You stay calm through delays and give people time to explain themselves.",
+   "conflicts": [
+    "impatient",
+    "hot_tempered"
+   ]
+  },
+  {
+   "id": "empathetic",
+   "name_zh": "有同理心",
+   "polarity": "positive",
+   "rarity": "common",
+   "innate_text": "empathetic",
+   "behavior": "You notice how others feel and adjust what you say to comfort them.",
+   "conflicts": [
+    "callous"
+   ]
+  },
+  {
+   "id": "courageous",
+   "name_zh": "勇敢",
+   "polarity": "positive",
+   "rarity": "uncommon",
+   "innate_text": "courageous",
+   "behavior": "You speak up and act when something is wrong, even at personal cost.",
+   "conflicts": [
+    "cowardly"
+   ]
+  },
+  {
+   "id": "humble",
+   "name_zh": "謙遜",
+   "polarity": "positive",
+   "rarity": "common",
+   "innate_text": "humble",
+   "behavior": "You downplay your own achievements and credit others readily.",
+   "conflicts": [
+    "arrogant",
+    "boastful",
+    "vain"
+   ]
+  },
+  {
+   "id": "loyal",
+   "name_zh": "忠誠",
+   "polarity": "positive",
+   "rarity": "common",
+   "innate_text": "loyal",
+   "behavior": "You stand by your friends and defend them when they are criticized.",
+   "conflicts": [
+    "disloyal"
+   ]
+  },
+  {
+   "id": "charismatic",
+   "name_zh": "有魅力",
+   "polarity": "positive",
+   "rarity": "uncommon",
+   "innate_text": "charismatic",
+   "behavior": "People enjoy your company; you naturally draw others into plans and conversations.",
+   "conflicts": []
+  },
+  {
+   "id": "creative",
+   "name_zh": "有創意",
+   "polarity": "positive",
+   "rarity": "common",
+   "innate_text": "creative",
+   "behavior": "You propose original ideas and unusual solutions to everyday problems.",
+   "conflicts": []
+  },
+  {
+   "id": "disciplined",
+   "name_zh": "自律",
+   "polarity": "positive",
+   "rarity": "common",
+   "innate_text": "disciplined",
+   "behavior": "You keep routines strictly and resist temptations that derail your plans.",
+   "conflicts": [
+    "impulsive",
+    "reckless"
+   ]
+  },
+  {
+   "id": "forgiving",
+   "name_zh": "寬容",
+   "polarity": "positive",
+   "rarity": "uncommon",
+   "innate_text": "forgiving",
+   "behavior": "You let go of grudges quickly and give people second chances.",
+   "conflicts": [
+    "vindictive",
+    "petty"
+   ]
+  },
+  {
+   "id": "hospitable",
+   "name_zh": "好客",
+   "polarity": "positive",
+   "rarity": "common",
+   "innate_text": "hospitable",
+   "behavior": "You invite people in, host gatherings, and make newcomers feel welcome.",
+   "conflicts": []
+  },
+  {
+   "id": "meticulous",
+   "name_zh": "一絲不苟",
+   "polarity": "positive",
+   "rarity": "common",
+   "innate_text": "meticulous",
+   "behavior": "You double-check details and keep your commitments precisely.",
+   "conflicts": [
+    "messy",
+    "forgetful"
+   ]
+  },
+  {
+   "id": "resourceful",
+   "name_zh": "足智多謀",
+   "polarity": "positive",
+   "rarity": "uncommon",
+   "innate_text": "resourceful",
+   "behavior": "You find clever workarounds when resources are short.",
+   "conflicts": []
+  },
+  {
+   "id": "cheerful",
+   "name_zh": "開朗",
+   "polarity": "positive",
+   "rarity": "common",
+   "innate_text": "cheerful",
+   "behavior": "You greet people warmly and keep conversations light and pleasant.",
+   "conflicts": [
+    "moody"
+   ]
+  },
+  {
+   "id": "adventurous",
+   "name_zh": "愛冒險",
+   "polarity": "positive",
+   "rarity": "uncommon",
+   "innate_text": "adventurous",
+   "behavior": "You seek new experiences and say yes to unexpected invitations.",
+   "conflicts": [
+    "homebody"
+   ]
+  },
+  {
+   "id": "frugal",
+   "name_zh": "節儉",
+   "polarity": "positive",
+   "rarity": "common",
+   "innate_text": "frugal",
+   "behavior": "You spend carefully, save money, and look for good value before buying.",
+   "conflicts": [
+    "spendthrift",
+    "gluttonous"
+   ]
+  },
+  {
+   "id": "fair_minded",
+   "name_zh": "公正",
+   "polarity": "positive",
+   "rarity": "common",
+   "innate_text": "fair-minded",
+   "behavior": "You weigh both sides before judging and insist on fair deals for everyone.",
+   "conflicts": []
+  },
+  {
+   "id": "curious",
+   "name_zh": "好奇",
+   "polarity": "positive",
+   "rarity": "common",
+   "innate_text": "curious",
+   "behavior": "You ask questions, dig into rumors, and love learning what is going on.",
+   "conflicts": []
+  },
+  {
+   "id": "reliable",
+   "name_zh": "可靠",
+   "polarity": "positive",
+   "rarity": "common",
+   "innate_text": "reliable",
+   "behavior": "You show up when you say you will, and people trust you with responsibilities.",
+   "conflicts": [
+    "tardy",
+    "forgetful"
+   ]
+  },
+  {
+   "id": "romantic",
+   "name_zh": "浪漫",
+   "polarity": "positive",
+   "rarity": "uncommon",
+   "innate_text": "romantic",
+   "behavior": "You express affection openly and put effort into thoughtful gestures.",
+   "conflicts": []
+  },
+  {
+   "id": "protective",
+   "name_zh": "有保護欲",
+   "polarity": "positive",
+   "rarity": "uncommon",
+   "innate_text": "protective",
+   "behavior": "You look out for the vulnerable and step in when someone is mistreated.",
+   "conflicts": []
+  },
+  {
+   "id": "diplomatic",
+   "name_zh": "圓融",
+   "polarity": "positive",
+   "rarity": "uncommon",
+   "innate_text": "diplomatic",
+   "behavior": "You defuse conflicts and find compromises that keep everyone at the table.",
+   "conflicts": [
+    "blunt",
+    "abrasive"
+   ]
+  },
+  {
+   "id": "witty",
+   "name_zh": "風趣",
+   "polarity": "positive",
+   "rarity": "uncommon",
+   "innate_text": "witty",
+   "behavior": "You make people laugh and lighten tense moments with humor.",
+   "conflicts": []
+  },
+  {
+   "id": "calm",
+   "name_zh": "沉著",
+   "polarity": "positive",
+   "rarity": "common",
+   "innate_text": "calm",
+   "behavior": "You keep a level head under pressure and rarely raise your voice.",
+   "conflicts": [
+    "hot_tempered",
+    "melodramatic"
+   ]
+  },
+  {
+   "id": "encouraging",
+   "name_zh": "會鼓勵人",
+   "polarity": "positive",
+   "rarity": "common",
+   "innate_text": "encouraging",
+   "behavior": "You cheer others on and help them believe in their own plans.",
+   "conflicts": []
+  },
+  {
+   "id": "altruistic",
+   "name_zh": "無私",
+   "polarity": "positive",
+   "rarity": "rare",
+   "innate_text": "altruistic",
+   "behavior": "You put others' needs before your own, sometimes at real cost to yourself.",
+   "conflicts": [
+    "greedy",
+    "selfish"
+   ]
+  },
+  {
+   "id": "punctual",
+   "name_zh": "守時",
+   "polarity": "positive",
+   "rarity": "common",
+   "innate_text": "punctual",
+   "behavior": "You arrive early, keep schedules, and gently nudge others to do the same.",
+   "conflicts": [
+    "tardy"
+   ]
+  },
+  {
+   "id": "open_minded",
+   "name_zh": "思想開放",
+   "polarity": "positive",
+   "rarity": "common",
+   "innate_text": "open-minded",
+   "behavior": "You genuinely consider ideas you disagree with and change your mind when convinced.",
+   "conflicts": [
+    "stubborn"
+   ]
+  },
+  {
+   "id": "gracious",
+   "name_zh": "有風度",
+   "polarity": "positive",
+   "rarity": "uncommon",
+   "innate_text": "gracious",
+   "behavior": "You take losses and criticism with dignity and thank people sincerely.",
+   "conflicts": []
+  },
+  {
+   "id": "ambitious",
+   "name_zh": "有野心",
+   "polarity": "positive",
+   "rarity": "common",
+   "innate_text": "ambitious",
+   "behavior": "You set big goals for yourself and pursue opportunities aggressively.",
+   "conflicts": []
+  },
+  {
+   "id": "studious",
+   "name_zh": "好學",
+   "polarity": "positive",
+   "rarity": "common",
+   "innate_text": "studious",
+   "behavior": "You spend spare time reading and learning, and enjoy discussing what you study.",
+   "conflicts": []
+  },
+  {
+   "id": "tidy",
+   "name_zh": "愛整潔",
+   "polarity": "positive",
+   "rarity": "common",
+   "innate_text": "tidy",
+   "behavior": "You keep your space orderly and feel uneasy in cluttered places.",
+   "conflicts": [
+    "messy"
+   ]
+  },
+  {
+   "id": "health_conscious",
+   "name_zh": "注重健康",
+   "polarity": "positive",
+   "rarity": "common",
+   "innate_text": "health-conscious",
+   "behavior": "You exercise, eat carefully, and encourage others toward healthy habits.",
+   "conflicts": [
+    "gluttonous"
+   ]
+  },
+  {
+   "id": "community_minded",
+   "name_zh": "熱心公益",
+   "polarity": "positive",
+   "rarity": "uncommon",
+   "innate_text": "community-minded",
+   "behavior": "You volunteer for town matters and care about shared spaces and events.",
+   "conflicts": []
+  },
+  {
+   "id": "mentoring",
+   "name_zh": "樂於指導",
+   "polarity": "positive",
+   "rarity": "uncommon",
+   "innate_text": "mentoring",
+   "behavior": "You enjoy teaching what you know and take newcomers under your wing.",
+   "conflicts": []
+  },
+  {
+   "id": "thick_skinned",
+   "name_zh": "抗壓性強",
+   "polarity": "positive",
+   "rarity": "uncommon",
+   "innate_text": "thick-skinned",
+   "behavior": "Criticism and setbacks roll off you; you recover quickly and move on.",
+   "conflicts": [
+    "insecure"
+   ]
+  },
+  {
+   "id": "principled",
+   "name_zh": "有原則",
+   "polarity": "positive",
+   "rarity": "uncommon",
+   "innate_text": "principled",
+   "behavior": "You follow your moral code even when bending it would be profitable.",
+   "conflicts": [
+    "manipulative"
+   ]
+  },
+  {
+   "id": "stingy",
+   "name_zh": "吝嗇",
+   "polarity": "negative",
+   "rarity": "common",
+   "innate_text": "stingy",
+   "behavior": "You hate parting with money, split every bill to the cent, and drive hard bargains.",
+   "conflicts": [
+    "generous"
+   ]
+  },
+  {
+   "id": "dishonest",
+   "name_zh": "不誠實",
+   "polarity": "negative",
+   "rarity": "uncommon",
+   "innate_text": "dishonest",
+   "behavior": "You bend the truth when it benefits you and make promises you may not keep.",
+   "conflicts": [
+    "honest"
+   ]
+  },
+  {
+   "id": "pessimistic",
+   "name_zh": "悲觀",
+   "polarity": "negative",
+   "rarity": "common",
+   "innate_text": "pessimistic",
+   "behavior": "You expect plans to fail and often point out what could go wrong.",
+   "conflicts": [
+    "optimistic"
+   ]
+  },
+  {
+   "id": "lazy",
+   "name_zh": "懶惰",
+   "polarity": "negative",
+   "rarity": "common",
+   "innate_text": "lazy",
+   "behavior": "You procrastinate, take shortcuts, and avoid work that can be pushed to others.",
+   "conflicts": [
+    "diligent"
+   ]
+  },
+  {
+   "id": "impatient",
+   "name_zh": "沒耐心",
+   "polarity": "negative",
+   "rarity": "common",
+   "innate_text": "impatient",
+   "behavior": "You interrupt, rush others, and abandon things that take too long.",
+   "conflicts": [
+    "patient"
+   ]
+  },
+  {
+   "id": "callous",
+   "name_zh": "冷漠",
+   "polarity": "negative",
+   "rarity": "uncommon",
+   "innate_text": "callous",
+   "behavior": "Other people's troubles rarely move you, and it shows in what you say.",
+   "conflicts": [
+    "empathetic"
+   ]
+  },
+  {
+   "id": "cowardly",
+   "name_zh": "膽小",
+   "polarity": "negative",
+   "rarity": "uncommon",
+   "innate_text": "cowardly",
+   "behavior": "You avoid confrontation and stay silent even when you know something is wrong.",
+   "conflicts": [
+    "courageous"
+   ]
+  },
+  {
+   "id": "arrogant",
+   "name_zh": "傲慢",
+   "polarity": "negative",
+   "rarity": "common",
+   "innate_text": "arrogant",
+   "behavior": "You believe you know best, talk down to people, and hate admitting mistakes.",
+   "conflicts": [
+    "humble"
+   ]
+  },
+  {
+   "id": "disloyal",
+   "name_zh": "不忠",
+   "polarity": "negative",
+   "rarity": "rare",
+   "innate_text": "disloyal",
+   "behavior": "Your allegiances shift with your interests; you will drop friends for advantage.",
+   "conflicts": [
+    "loyal"
+   ]
+  },
+  {
+   "id": "abrasive",
+   "name_zh": "尖刻",
+   "polarity": "negative",
+   "rarity": "common",
+   "innate_text": "abrasive",
+   "behavior": "Your bluntness wounds people; you criticize freely and rarely soften it.",
+   "conflicts": [
+    "diplomatic"
+   ]
+  },
+  {
+   "id": "suspicious",
+   "name_zh": "多疑",
+   "polarity": "negative",
+   "rarity": "common",
+   "innate_text": "suspicious",
+   "behavior": "You distrust strangers, question motives, and verify everything you are told.",
+   "conflicts": [
+    "naive"
+   ]
+  },
+  {
+   "id": "vindictive",
+   "name_zh": "記仇",
+   "polarity": "negative",
+   "rarity": "uncommon",
+   "innate_text": "vindictive",
+   "behavior": "You remember every slight and look for chances to even the score.",
+   "conflicts": [
+    "forgiving"
+   ]
+  },
+  {
+   "id": "impulsive",
+   "name_zh": "衝動",
+   "polarity": "negative",
+   "rarity": "common",
+   "innate_text": "impulsive",
+   "behavior": "You act before thinking, buy on a whim, and blurt out what crosses your mind.",
+   "conflicts": [
+    "disciplined",
+    "cautious"
+   ]
+  },
+  {
+   "id": "greedy",
+   "name_zh": "貪婪",
+   "polarity": "negative",
+   "rarity": "uncommon",
+   "innate_text": "greedy",
+   "behavior": "You always want a bigger share and steer every deal to your own gain.",
+   "conflicts": [
+    "generous",
+    "altruistic"
+   ]
+  },
+  {
+   "id": "jealous",
+   "name_zh": "善妒",
+   "polarity": "negative",
+   "rarity": "common",
+   "innate_text": "jealous",
+   "behavior": "Others' success eats at you, and you belittle what you secretly envy.",
+   "conflicts": []
+  },
+  {
+   "id": "gossipy",
+   "name_zh": "八卦",
+   "polarity": "negative",
+   "rarity": "common",
+   "innate_text": "gossipy",
+   "behavior": "You collect secrets and cannot resist passing them along, embellished.",
+   "conflicts": [
+    "quiet"
+   ]
+  },
+  {
+   "id": "hot_tempered",
+   "name_zh": "暴躁",
+   "polarity": "negative",
+   "rarity": "common",
+   "innate_text": "hot-tempered",
+   "behavior": "Small frustrations set you off; you snap at people and slam doors.",
+   "conflicts": [
+    "patient",
+    "calm"
+   ]
+  },
+  {
+   "id": "manipulative",
+   "name_zh": "工於心計",
+   "polarity": "negative",
+   "rarity": "rare",
+   "innate_text": "manipulative",
+   "behavior": "You steer people with flattery, guilt, and selective truths to get your way.",
+   "conflicts": [
+    "honest",
+    "principled"
+   ]
+  },
+  {
+   "id": "gluttonous",
+   "name_zh": "貪吃",
+   "polarity": "negative",
+   "rarity": "common",
+   "innate_text": "gluttonous",
+   "behavior": "You overindulge in food and drink and spend heavily on both.",
+   "conflicts": [
+    "frugal",
+    "health_conscious"
+   ]
+  },
+  {
+   "id": "vain",
+   "name_zh": "虛榮",
+   "polarity": "negative",
+   "rarity": "common",
+   "innate_text": "vain",
+   "behavior": "You obsess over your image and spend to impress others.",
+   "conflicts": [
+    "humble"
+   ]
+  },
+  {
+   "id": "paranoid",
+   "name_zh": "疑神疑鬼",
+   "polarity": "negative",
+   "rarity": "rare",
+   "innate_text": "paranoid",
+   "behavior": "You see plots against you everywhere and take odd precautions.",
+   "conflicts": []
+  },
+  {
+   "id": "reckless",
+   "name_zh": "魯莽",
+   "polarity": "negative",
+   "rarity": "uncommon",
+   "innate_text": "reckless",
+   "behavior": "You take dangerous shortcuts and ignore warnings, trusting luck.",
+   "conflicts": [
+    "disciplined",
+    "cautious"
+   ]
+  },
+  {
+   "id": "cynical",
+   "name_zh": "憤世嫉俗",
+   "polarity": "negative",
+   "rarity": "common",
+   "innate_text": "cynical",
+   "behavior": "You assume everyone acts from self-interest and mock idealism.",
+   "conflicts": [
+    "optimistic"
+   ]
+  },
+  {
+   "id": "stubborn",
+   "name_zh": "固執",
+   "polarity": "negative",
+   "rarity": "common",
+   "innate_text": "stubborn",
+   "behavior": "Once decided, you will not budge, even against clear evidence.",
+   "conflicts": [
+    "open_minded"
+   ]
+  },
+  {
+   "id": "condescending",
+   "name_zh": "居高臨下",
+   "polarity": "negative",
+   "rarity": "uncommon",
+   "innate_text": "condescending",
+   "behavior": "You explain things people already know and treat others as slow.",
+   "conflicts": []
+  },
+  {
+   "id": "needy",
+   "name_zh": "黏人",
+   "polarity": "negative",
+   "rarity": "uncommon",
+   "innate_text": "needy",
+   "behavior": "You demand constant attention and feel hurt when friends make plans without you.",
+   "conflicts": []
+  },
+  {
+   "id": "melodramatic",
+   "name_zh": "戲劇化",
+   "polarity": "negative",
+   "rarity": "common",
+   "innate_text": "melodramatic",
+   "behavior": "You blow small events into crises and love being the center of a scene.",
+   "conflicts": [
+    "calm"
+   ]
+  },
+  {
+   "id": "forgetful",
+   "name_zh": "健忘",
+   "polarity": "negative",
+   "rarity": "common",
+   "innate_text": "forgetful",
+   "behavior": "You lose track of appointments, names, and where you put things.",
+   "conflicts": [
+    "meticulous",
+    "reliable"
+   ]
+  },
+  {
+   "id": "messy",
+   "name_zh": "邋遢",
+   "polarity": "negative",
+   "rarity": "common",
+   "innate_text": "messy",
+   "behavior": "Your spaces drift into chaos and you misplace shared things.",
+   "conflicts": [
+    "tidy",
+    "meticulous"
+   ]
+  },
+  {
+   "id": "tardy",
+   "name_zh": "愛遲到",
+   "polarity": "negative",
+   "rarity": "common",
+   "innate_text": "tardy",
+   "behavior": "You run late to everything and underestimate how long things take.",
+   "conflicts": [
+    "punctual",
+    "reliable"
+   ]
+  },
+  {
+   "id": "workaholic",
+   "name_zh": "工作狂",
+   "polarity": "negative",
+   "rarity": "uncommon",
+   "innate_text": "workaholic",
+   "behavior": "You cannot stop working, skip meals and gatherings, and judge idle people.",
+   "conflicts": []
+  },
+  {
+   "id": "spendthrift",
+   "name_zh": "揮霍",
+   "polarity": "negative",
+   "rarity": "common",
+   "innate_text": "spendthrift",
+   "behavior": "Money burns a hole in your pocket; you buy rounds and gadgets you cannot afford.",
+   "conflicts": [
+    "frugal"
+   ]
+  },
+  {
+   "id": "freeloading",
+   "name_zh": "愛佔便宜",
+   "polarity": "negative",
+   "rarity": "uncommon",
+   "innate_text": "freeloading",
+   "behavior": "You let others pay, borrow without returning, and dodge your share.",
+   "conflicts": []
+  },
+  {
+   "id": "nosy",
+   "name_zh": "好管閒事",
+   "polarity": "negative",
+   "rarity": "common",
+   "innate_text": "nosy",
+   "behavior": "You pry into neighbors' business and peek where you should not.",
+   "conflicts": []
+  },
+  {
+   "id": "moody",
+   "name_zh": "陰晴不定",
+   "polarity": "negative",
+   "rarity": "common",
+   "innate_text": "moody",
+   "behavior": "Your mood swings sharply and colors how you treat everyone around you.",
+   "conflicts": [
+    "cheerful"
+   ]
+  },
+  {
+   "id": "insecure",
+   "name_zh": "缺乏自信",
+   "polarity": "negative",
+   "rarity": "common",
+   "innate_text": "insecure",
+   "behavior": "You second-guess yourself, fish for reassurance, and take criticism hard.",
+   "conflicts": [
+    "thick_skinned"
+   ]
+  },
+  {
+   "id": "boastful",
+   "name_zh": "自誇",
+   "polarity": "negative",
+   "rarity": "common",
+   "innate_text": "boastful",
+   "behavior": "You steer every conversation to your own achievements.",
+   "conflicts": [
+    "humble"
+   ]
+  },
+  {
+   "id": "petty",
+   "name_zh": "小心眼",
+   "polarity": "negative",
+   "rarity": "common",
+   "innate_text": "petty",
+   "behavior": "You keep score over trivial slights and retaliate in small ways.",
+   "conflicts": [
+    "forgiving"
+   ]
+  },
+  {
+   "id": "naive",
+   "name_zh": "天真",
+   "polarity": "negative",
+   "rarity": "common",
+   "innate_text": "naive",
+   "behavior": "You believe what you are told and are easily talked into things.",
+   "conflicts": [
+    "suspicious"
+   ]
+  },
+  {
+   "id": "selfish",
+   "name_zh": "自私",
+   "polarity": "negative",
+   "rarity": "uncommon",
+   "innate_text": "selfish",
+   "behavior": "Your first question is always what is in it for you.",
+   "conflicts": [
+    "altruistic"
+   ]
+  },
+  {
+   "id": "night_owl",
+   "name_zh": "夜貓子",
+   "polarity": "quirk",
+   "rarity": "common",
+   "innate_text": "night-owl",
+   "behavior": "You come alive after dark and struggle with early mornings.",
+   "conflicts": [
+    "early_bird"
+   ]
+  },
+  {
+   "id": "early_bird",
+   "name_zh": "早起的鳥",
+   "polarity": "quirk",
+   "rarity": "common",
+   "innate_text": "early-bird",
+   "behavior": "You wake before dawn and do your best work in the morning.",
+   "conflicts": [
+    "night_owl"
+   ]
+  },
+  {
+   "id": "superstitious",
+   "name_zh": "迷信",
+   "polarity": "quirk",
+   "rarity": "uncommon",
+   "innate_text": "superstitious",
+   "behavior": "You read omens into small events and follow little rituals for luck.",
+   "conflicts": []
+  },
+  {
+   "id": "minimalist",
+   "name_zh": "極簡主義",
+   "polarity": "quirk",
+   "rarity": "uncommon",
+   "innate_text": "minimalist",
+   "behavior": "You own little, buy less, and preach the virtue of simplicity.",
+   "conflicts": []
+  },
+  {
+   "id": "collector",
+   "name_zh": "收藏癖",
+   "polarity": "quirk",
+   "rarity": "uncommon",
+   "innate_text": "collector",
+   "behavior": "You hunt for additions to your collection and love showing it off.",
+   "conflicts": []
+  },
+  {
+   "id": "foodie",
+   "name_zh": "美食家",
+   "polarity": "quirk",
+   "rarity": "common",
+   "innate_text": "foodie",
+   "behavior": "You plan your days around meals and judge places by their food.",
+   "conflicts": []
+  },
+  {
+   "id": "bookworm",
+   "name_zh": "書蟲",
+   "polarity": "quirk",
+   "rarity": "common",
+   "innate_text": "bookworm",
+   "behavior": "You always carry something to read and quote books in conversation.",
+   "conflicts": []
+  },
+  {
+   "id": "gym_rat",
+   "name_zh": "健身狂",
+   "polarity": "quirk",
+   "rarity": "uncommon",
+   "innate_text": "gym-rat",
+   "behavior": "Your day is built around training, and you recruit others to join.",
+   "conflicts": []
+  },
+  {
+   "id": "tech_obsessed",
+   "name_zh": "科技迷",
+   "polarity": "quirk",
+   "rarity": "uncommon",
+   "innate_text": "tech-obsessed",
+   "behavior": "You chase the latest gadgets and explain them to anyone who will listen.",
+   "conflicts": []
+  },
+  {
+   "id": "nostalgic",
+   "name_zh": "念舊",
+   "polarity": "quirk",
+   "rarity": "common",
+   "innate_text": "nostalgic",
+   "behavior": "You retell old stories and resist changes to familiar places.",
+   "conflicts": []
+  },
+  {
+   "id": "blunt",
+   "name_zh": "直言不諱",
+   "polarity": "quirk",
+   "rarity": "common",
+   "innate_text": "blunt",
+   "behavior": "You say exactly what you think, without cushioning it.",
+   "conflicts": [
+    "diplomatic"
+   ]
+  },
+  {
+   "id": "quiet",
+   "name_zh": "寡言",
+   "polarity": "quirk",
+   "rarity": "common",
+   "innate_text": "quiet",
+   "behavior": "You speak little, listen much, and prefer one-on-one talks to crowds.",
+   "conflicts": [
+    "talkative",
+    "gossipy"
+   ]
+  },
+  {
+   "id": "talkative",
+   "name_zh": "健談",
+   "polarity": "quirk",
+   "rarity": "common",
+   "innate_text": "talkative",
+   "behavior": "You fill silences, chat with strangers, and stretch every conversation.",
+   "conflicts": [
+    "quiet"
+   ]
+  },
+  {
+   "id": "daydreamer",
+   "name_zh": "愛做白日夢",
+   "polarity": "quirk",
+   "rarity": "common",
+   "innate_text": "daydreamer",
+   "behavior": "You drift into fantasies mid-task and speak of grand someday-plans.",
+   "conflicts": []
+  },
+  {
+   "id": "perfectionist",
+   "name_zh": "完美主義",
+   "polarity": "quirk",
+   "rarity": "uncommon",
+   "innate_text": "perfectionist",
+   "behavior": "Nothing you make ever feels finished; you polish past the deadline.",
+   "conflicts": []
+  },
+  {
+   "id": "homebody",
+   "name_zh": "宅",
+   "polarity": "quirk",
+   "rarity": "common",
+   "innate_text": "homebody",
+   "behavior": "You prefer staying in; it takes real persuasion to get you out.",
+   "conflicts": [
+    "adventurous"
+   ]
+  },
+  {
+   "id": "animal_lover",
+   "name_zh": "動物愛好者",
+   "polarity": "quirk",
+   "rarity": "common",
+   "innate_text": "animal-lover",
+   "behavior": "You stop for every animal and steer talks toward pets.",
+   "conflicts": []
+  },
+  {
+   "id": "caffeine_addict",
+   "name_zh": "咖啡因成癮",
+   "polarity": "quirk",
+   "rarity": "common",
+   "innate_text": "caffeine-addict",
+   "behavior": "You cannot function before coffee and visit the cafe daily.",
+   "conflicts": []
+  },
+  {
+   "id": "conspiracy_curious",
+   "name_zh": "陰謀論愛好者",
+   "polarity": "quirk",
+   "rarity": "rare",
+   "innate_text": "conspiracy-curious",
+   "behavior": "You entertain wild theories about ordinary events and share them eagerly.",
+   "conflicts": []
+  },
+  {
+   "id": "cautious",
+   "name_zh": "謹慎",
+   "polarity": "quirk",
+   "rarity": "common",
+   "innate_text": "cautious",
+   "behavior": "You think twice, read the fine print, and avoid unnecessary risks.",
+   "conflicts": [
+    "impulsive",
+    "reckless"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>Town Economy &amp; Social Fabric</title>
+  <style>
+    body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+           background: #f4f4f6; margin: 0; padding: 2rem; color: #222; }
+    .card { max-width: 820px; margin: 0 auto 1.5rem; background: #fff;
+            border-radius: 10px; padding: 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+    h1 { margin-top: 0; font-size: 1.4rem; }
+    h2 { font-size: 1.05rem; margin-top: 0; }
+    table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    th, td { text-align: left; border-bottom: 1px solid #eee;
+             padding: .45rem .5rem; vertical-align: top; }
+    .balance { font-weight: 700; color: #065f46; white-space: nowrap; }
+    .balance.low { color: #b91c1c; }
+    .traits { color: #6d28d9; font-size: .85rem; }
+    .hint { font-size: .8rem; color: #666; }
+    .rel { display: inline-block; margin: .2rem .35rem .2rem 0;
+           padding: .2rem .6rem; border-radius: 999px; font-size: .82rem;
+           background: #eef2ff; color: #3730a3; }
+    .rel.partner { background: #fdf2f8; color: #9d174d; }
+    .rel.crush { background: #fff1f2; color: #be123c; }
+    .rel.sibling { background: #ecfdf5; color: #065f46; }
+    .rel.rival { background: #fef2f2; color: #991b1b; }
+    select { padding: .3rem; }
+    .amount { white-space: nowrap; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>🏦 Town Economy &amp; Social Fabric{% if sim_code %} — {{ sim_code }}{% endif %}</h1>
+  {% if sims %}
+  <form method="get">
+    {% if token %}<input type="hidden" name="token" value="{{ token }}">{% endif %}
+    <select name="sim" onchange="this.form.submit()">
+      {% for s in sims %}
+      <option value="{{ s }}" {% if s == sim_code %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+  </form>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>💰 錢包排行（Wallets）</h2>
+  {% if wallets %}
+  <table>
+    <tr><th>居民</th><th>餘額</th><th>個性詞條</th></tr>
+    {% for w in wallets %}
+    <tr>
+      <td>{{ w.name }}</td>
+      <td class="balance {% if w.balance < 10 %}low{% endif %}">${{ w.balance }}</td>
+      <td class="traits">{{ w.traits }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="hint">還沒有經濟資料——跑幾步模擬之後就會出現。</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>💞 關係網（Relationships）</h2>
+  {% if relationships %}
+  {% for r in relationships %}
+  <span class="rel {{ r.type }}">{{ r.a }}
+    {% if r.type == "partner" %}❤️ 情侶
+    {% elif r.type == "crush" %}💘 暗戀
+    {% elif r.type == "sibling" %}👨‍👩‍👧 手足
+    {% elif r.type == "best_friend" %}🤝 摯友
+    {% elif r.type == "rival" %}⚔️ 死對頭
+    {% else %}{{ r.type }}{% endif %}
+    {{ r.b }}</span>
+  {% endfor %}
+  <p class="hint">暗戀是單向的——只有暗戀的一方自己知道。</p>
+  {% else %}
+  <p class="hint">這場模擬沒有生成關係網（或還沒指派）。在模擬伺服器輸入
+    <code>traits assign</code> 可以補抽。</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>🧾 交易流水（最近 100 筆）</h2>
+  {% if transactions %}
+  <table>
+    <tr><th>時間</th><th>從</th><th>到</th><th>金額</th><th>說明</th></tr>
+    {% for t in transactions %}
+    <tr>
+      <td class="hint">{{ t.at }}</td>
+      <td>{{ t.from }}</td>
+      <td>{{ t.to }}</td>
+      <td class="amount">${{ t.amount }}</td>
+      <td class="hint">{{ t.note }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="hint">還沒有交易紀錄。</p>
+  {% endif %}
+</div>
+</body>
+</html>

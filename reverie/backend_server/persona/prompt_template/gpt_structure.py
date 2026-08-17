@@ -35,6 +35,10 @@ _SMART_CHAT_MODEL = globals().get("openai_smart_chat_model", _CHAT_MODEL)
 _EMBEDDING_MODEL = globals().get("openai_embedding_model",
                                  "text-embedding-3-small")
 _BASE_URL = globals().get("openai_base_url", None) or None
+# Embeddings may be served by a different provider than chat; empty values
+# fall back to the chat provider's endpoint/key.
+_EMB_BASE_URL = globals().get("embedding_base_url", None) or _BASE_URL
+_EMB_API_KEY = globals().get("embedding_api_key", None) or None
 _CACHE_ENABLED = globals().get("llm_cache_enabled", True)
 _CACHE_PATH = globals().get("llm_cache_path", "") or os.path.join(
   os.path.dirname(os.path.abspath(__file__)), "..", "..", "llm_cache.sqlite")
@@ -57,6 +61,7 @@ _PRICE_TABLE = {
 _PRICE_TABLE.update(globals().get("llm_price_table", {}))
 
 _client = None
+_emb_client = None
 _client_lock = threading.Lock()
 
 
@@ -68,9 +73,24 @@ def _get_client():
       if not api_key and not _BASE_URL:
         raise RuntimeError(
           "No API key configured. Set the OPENAI_API_KEY environment "
-          "variable (see reverie/backend_server/utils.py).")
+          "variable or use the frontend's /settings page (see "
+          "reverie/backend_server/utils.py).")
       _client = OpenAI(api_key=api_key or "not-needed", base_url=_BASE_URL)
     return _client
+
+
+def _get_embedding_client():
+  global _emb_client
+  with _client_lock:
+    if _emb_client is None:
+      api_key = _EMB_API_KEY or globals().get("openai_api_key", "") or None
+      if not api_key and not _EMB_BASE_URL:
+        raise RuntimeError(
+          "No embedding API key configured. Set OPENAI_API_KEY / "
+          "EMBEDDING_API_KEY or use the frontend's /settings page.")
+      _emb_client = OpenAI(api_key=api_key or "not-needed",
+                           base_url=_EMB_BASE_URL)
+    return _emb_client
 
 
 def _resolve_model(engine):
@@ -482,7 +502,7 @@ def get_embedding(text, model=None):
     _record_usage(model, 0, 0, cached=True)
     return cached
 
-  client = _get_client()
+  client = _get_embedding_client()
 
   last_err = None
   for attempt in range(_MAX_RETRIES):

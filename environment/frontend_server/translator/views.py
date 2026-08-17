@@ -321,3 +321,76 @@ def path_tester_update(request):
 
 
 
+
+
+# ============================================================================
+# LLM provider settings page
+# ============================================================================
+
+_LLM_CONFIG_FIELDS = ["provider", "base_url", "chat_model",
+                      "smart_chat_model", "embedding_base_url",
+                      "embedding_model"]
+_LLM_SECRET_FIELDS = ["api_key", "embedding_api_key"]
+
+
+def _llm_config_path():
+  # Shared with the backend (reverie/backend_server/utils.py): a single
+  # llm_config.json at the repository root.
+  return os.environ.get("LLM_CONFIG_PATH", os.path.abspath(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "..", "..",
+    "llm_config.json")))
+
+
+def _mask_key(key):
+  if not key:
+    return ""
+  if len(key) <= 8:
+    return "*" * len(key)
+  return key[:4] + "*" * 6 + key[-4:]
+
+
+def llm_settings(request):
+  """
+  Web UI for configuring the LLM provider (OpenAI, DeepSeek, MiniMax,
+  Gemini, Ollama, or any OpenAI-compatible endpoint). Saves to a
+  llm_config.json shared with the simulation backend; restart reverie.py
+  to apply changes. Optionally protected by the SETTINGS_TOKEN env var.
+  """
+  required_token = os.environ.get("SETTINGS_TOKEN", "")
+  supplied_token = request.POST.get("token", request.GET.get("token", ""))
+  if required_token and supplied_token != required_token:
+    return HttpResponse(
+      "Forbidden: this page is protected. Append ?token=<SETTINGS_TOKEN> "
+      "to the URL.", status=403)
+
+  cfg_path = _llm_config_path()
+  try:
+    with open(cfg_path) as f:
+      cfg = json.load(f)
+  except (OSError, ValueError):
+    cfg = {}
+
+  saved = False
+  if request.method == "POST":
+    for field in _LLM_CONFIG_FIELDS:
+      cfg[field] = request.POST.get(field, "").strip()
+    for field in _LLM_SECRET_FIELDS:
+      # A blank secret field means "keep the stored key".
+      posted = request.POST.get(field, "").strip()
+      if posted:
+        cfg[field] = posted
+    with open(cfg_path, "w") as f:
+      f.write(json.dumps(cfg, indent=2))
+    try:
+      os.chmod(cfg_path, 0o600)
+    except OSError:
+      pass
+    saved = True
+
+  context = {"cfg": cfg,
+             "api_key_masked": _mask_key(cfg.get("api_key", "")),
+             "embedding_api_key_masked": _mask_key(
+               cfg.get("embedding_api_key", "")),
+             "saved": saved,
+             "token": supplied_token}
+  return render(request, "settings/settings.html", context)

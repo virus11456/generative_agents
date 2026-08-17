@@ -18,7 +18,49 @@ This fork modernizes the original codebase so it runs today:
 * **Parallel persona steps** — each simulation step runs all agents' cognition concurrently in a thread pool (cross-agent conversations stay serialized for safety); disable with `PARALLEL_PERSONAS=0`.
 * **Auto-checkpoint & crash recovery** — the simulation saves itself every `CHECKPOINT_FREQ` steps (default 50) and on any crash, so progress can be resumed by forking the saved simulation.
 * **Token/cost accounting** — type `stats` at the simulation prompt for live token usage and estimated cost; stats are also saved to `reverie/llm_stats.json` inside each simulation folder.
-* **Python 3.11 + Django 4.2** — dependencies updated, retired APIs replaced, and offline unit tests added under `reverie/backend_server/tests`.
+* **Python 3.11 + Django 4.2** — dependencies updated, retired APIs replaced, and offline unit tests added under `reverie/backend_server/tests` and `translator/tests.py`.
+* **Player intervention** — `whisper <persona>: <thought>` injects a thought into an agent's memory stream mid-simulation (the paper's Valentine's-party mechanism), `interview <persona>` opens a live chat with an agent, and `help` lists every command.
+* **Web-based provider settings** — visit `/settings` on the environment server to pick a provider preset (OpenAI, DeepSeek, MiniMax, Gemini, Ollama, or any OpenAI-compatible endpoint) and enter API keys in the browser; saved to a git-ignored `llm_config.json` that overrides environment variables.
+
+## Configuring the LLM Provider from the Browser
+With the environment server running, open [http://localhost:8000/settings/](http://localhost:8000/settings/). Choose a preset — OpenAI, DeepSeek, MiniMax, Gemini, or Ollama — enter your API key, and save. The settings are written to `llm_config.json` at the repository root (file mode 600, git-ignored, keys never rendered back) and take effect the next time you start `reverie.py`.
+
+Notes:
+* DeepSeek and MiniMax have no OpenAI-compatible embedding endpoint, so the presets point the embedding section at OpenAI — fill in a separate embedding key there (or point it at Ollama/Gemini instead).
+* On a public server, set the `SETTINGS_TOKEN` environment variable and open the page as `/settings/?token=<value>`.
+
+## Intervening in a Running Simulation
+At the simulation server's `Enter option:` prompt:
+
+    whisper Isabella Rodriguez: I am planning a Valentine's Day party tonight
+    interview Klaus Mueller
+    stats
+    help
+
+`whisper` permanently plants a thought in the agent's memory (it will shape their plans and conversations); `interview` is a stateless chat that leaves no memory trace. Run at least one step before whispering.
+
+## Deploying on a VPS
+Both servers run fine on a small VPS (2 GB RAM is enough; the heavy lifting happens at the LLM provider):
+
+```bash
+git clone <your fork> && cd generative_agents
+python3 -m venv venv && . venv/bin/activate
+pip install -r requirements.txt
+
+# Environment server (port 8000; use gunicorn or runserver)
+cd environment/frontend_server
+ALLOWED_HOSTS=<your-domain-or-ip> SETTINGS_TOKEN=<secret> \
+  gunicorn frontend_server.wsgi -b 0.0.0.0:8000 --timeout 600
+
+# Simulation server (interactive CLI -- keep it in tmux/screen)
+cd reverie/backend_server
+tmux new -s reverie
+python reverie.py
+```
+
+Then open `http://<your-vps>:8000/settings/?token=<secret>` to enter API keys, and `http://<your-vps>:8000/simulator_home` to watch the simulation. Keep the `simulator_home` tab open while running — the browser drives the visual stepping.
+
+Security notes for public deployments: this app has no authentication, so restrict access — firewall port 8000 to your own IP, or put nginx with basic auth in front; always set `SETTINGS_TOKEN` and a real `ALLOWED_HOSTS` value.
 
 ## <img src="https://joonsungpark.s3.amazonaws.com:443/static/assets/characters/profile/Isabella_Rodriguez.png" alt="Generative Isabella">   Setting Up the Environment 
 To set up your environment, you will need to provide your OpenAI API key and download the necessary packages.

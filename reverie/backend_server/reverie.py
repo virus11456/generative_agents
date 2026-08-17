@@ -582,6 +582,59 @@ class ReverieServer:
           # Example: stats
           ret_str += format_llm_stats()
 
+        elif sim_command.lower() in ["help", "h", "?"]:
+          ret_str += (
+            "Commands:\n"
+            "  run <count>                     -- run <count> simulation steps\n"
+            "  save                            -- save current progress\n"
+            "  fin                             -- save and quit\n"
+            "  exit                            -- quit WITHOUT saving (deletes this sim)\n"
+            "  stats                           -- LLM token usage and estimated cost\n"
+            "  whisper <persona>: <thought>    -- inject a thought into a persona's memory\n"
+            "                                     e.g. whisper Isabella Rodriguez: I am "
+            "planning a party tonight\n"
+            "  interview <persona>             -- chat with a persona (does not alter "
+            "its memory)\n"
+            "  print persona schedule <persona>\n"
+            "  print all persona schedule\n"
+            "  print persona current tile <persona>\n"
+            "  print persona associative memory (event|thought|chat) <persona>\n"
+            "  print persona spatial memory <persona>\n"
+            "  print current time\n"
+            "  print tile event <x>, <y>\n"
+            "  call -- load history the_ville/<file>.csv\n")
+
+        elif sim_command[:7].lower() == "whisper":
+          # Inject a thought straight into a persona's memory stream. This is
+          # the same mechanism as "call -- load history" but for a single
+          # whisper, e.g.:
+          # whisper Isabella Rodriguez: I am throwing a party tonight
+          body = sim_command[7:].strip()
+          persona_name, sep, whisper = body.partition(":")
+          persona_name = persona_name.strip()
+          whisper = whisper.strip()
+          if not sep or persona_name not in self.personas or not whisper:
+            ret_str += ("Usage: whisper <persona name>: <thought>\n"
+                        f"Known personas: {', '.join(self.personas.keys())}")
+          elif not self.personas[persona_name].scratch.curr_time:
+            ret_str += ("This simulation has not taken a step yet -- "
+                        "run at least 1 step before whispering.")
+          else:
+            load_history_via_whisper(self.personas,
+                                     [[persona_name, whisper]])
+            ret_str += f"Whispered to {persona_name}: {whisper}"
+
+        elif sim_command[:9].lower() == "interview":
+          # Stateless chat session with a persona (alias for
+          # "call -- analysis"). Nothing is saved to the persona's memory.
+          # Example: interview Isabella Rodriguez
+          persona_name = sim_command[9:].strip()
+          if persona_name not in self.personas:
+            ret_str += ("Usage: interview <persona name>\n"
+                        f"Known personas: {', '.join(self.personas.keys())}")
+          else:
+            self.personas[persona_name].open_convo_session("analysis")
+
         elif ("print current time"
               in sim_command[:18].lower()):
           # Print the current time of the world. 

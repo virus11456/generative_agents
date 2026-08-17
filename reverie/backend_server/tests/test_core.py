@@ -104,5 +104,54 @@ class TestSafeGenerate(unittest.TestCase):
     self.assertEqual(result, "FAILSAFE")
 
 
+class TestConfigFilePriority(unittest.TestCase):
+  """llm_config.json (written by the /settings web page) must override env
+  vars, and be ignored gracefully when absent or malformed."""
+
+  def _reload_utils(self):
+    import importlib
+    import utils
+    return importlib.reload(utils)
+
+  def tearDown(self):
+    os.environ.pop("LLM_CONFIG_PATH", None)
+    os.environ.pop("OPENAI_CHAT_MODEL", None)
+    self._reload_utils()
+
+  def test_file_overrides_env(self):
+    cfg_path = os.path.join(_TMP, "llm_config.json")
+    with open(cfg_path, "w") as f:
+      f.write('{"api_key": "sk-from-file", "chat_model": "deepseek-chat",'
+              ' "base_url": "https://api.deepseek.com"}')
+    os.environ["LLM_CONFIG_PATH"] = cfg_path
+    os.environ["OPENAI_CHAT_MODEL"] = "env-model"
+    utils = self._reload_utils()
+    self.assertEqual(utils.openai_api_key, "sk-from-file")
+    self.assertEqual(utils.openai_chat_model, "deepseek-chat")
+    self.assertEqual(utils.openai_base_url, "https://api.deepseek.com")
+
+  def test_env_used_when_no_file(self):
+    os.environ["LLM_CONFIG_PATH"] = os.path.join(_TMP, "missing.json")
+    os.environ["OPENAI_CHAT_MODEL"] = "env-model"
+    utils = self._reload_utils()
+    self.assertEqual(utils.openai_chat_model, "env-model")
+
+  def test_malformed_file_ignored(self):
+    cfg_path = os.path.join(_TMP, "bad_config.json")
+    with open(cfg_path, "w") as f:
+      f.write("{not json")
+    os.environ["LLM_CONFIG_PATH"] = cfg_path
+    utils = self._reload_utils()
+    self.assertEqual(utils.openai_chat_model, "gpt-4o-mini")
+
+  def test_embedding_key_falls_back_to_chat_key(self):
+    cfg_path = os.path.join(_TMP, "llm_config2.json")
+    with open(cfg_path, "w") as f:
+      f.write('{"api_key": "sk-chat-key"}')
+    os.environ["LLM_CONFIG_PATH"] = cfg_path
+    utils = self._reload_utils()
+    self.assertEqual(utils.embedding_api_key, "sk-chat-key")
+
+
 if __name__ == "__main__":
   unittest.main()

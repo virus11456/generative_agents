@@ -30,5 +30,6 @@ urlpatterns = [
     re_path(r'^update_environment/$', translator_views.update_environment, name='update_environment'),
     re_path(r'^path_tester/$', translator_views.path_tester, name='path_tester'),
     re_path(r'^path_tester_update/$', translator_views.path_tester_update, name='path_tester_update'),
+    re_path(r'^settings/$', translator_views.llm_settings, name='llm_settings'),
     path('admin/', admin.site.urls),
 ]

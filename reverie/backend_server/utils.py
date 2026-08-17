@@ -24,6 +24,7 @@ Optional:
   CHECKPOINT_FREQ       auto-save the simulation every N steps (default 50)
   REVERIE_DEBUG         set to 1 for verbose prompt debugging output
 """
+import json
 import os
 
 try:
@@ -32,14 +33,43 @@ try:
 except ImportError:
   pass
 
+# A shared llm_config.json (written by the frontend's /settings page) at the
+# repository root overrides environment variables, so keys entered in the web
+# UI win over whatever the process was started with. Restart reverie.py after
+# changing it.
+llm_config_path = os.environ.get("LLM_CONFIG_PATH", os.path.join(
+  os.path.dirname(os.path.abspath(__file__)), "..", "..", "llm_config.json"))
+
+
+def load_llm_config(path=None):
+  try:
+    with open(path or llm_config_path) as f:
+      return json.load(f)
+  except (OSError, ValueError):
+    return {}
+
+
+_file_cfg = load_llm_config()
+
+
+def _cfg(file_key, env_key, default=""):
+  return _file_cfg.get(file_key) or os.environ.get(env_key, default)
+
+
 # LLM provider configuration
-openai_api_key = os.environ.get("OPENAI_API_KEY", "")
-openai_base_url = os.environ.get("OPENAI_BASE_URL", "")
-openai_chat_model = os.environ.get("OPENAI_CHAT_MODEL", "gpt-4o-mini")
-openai_smart_chat_model = os.environ.get("OPENAI_SMART_CHAT_MODEL",
-                                         openai_chat_model)
-openai_embedding_model = os.environ.get("OPENAI_EMBEDDING_MODEL",
-                                        "text-embedding-3-small")
+openai_api_key = _cfg("api_key", "OPENAI_API_KEY")
+openai_base_url = _cfg("base_url", "OPENAI_BASE_URL")
+openai_chat_model = _cfg("chat_model", "OPENAI_CHAT_MODEL", "gpt-4o-mini")
+openai_smart_chat_model = _cfg("smart_chat_model", "OPENAI_SMART_CHAT_MODEL",
+                               openai_chat_model)
+openai_embedding_model = _cfg("embedding_model", "OPENAI_EMBEDDING_MODEL",
+                              "text-embedding-3-small")
+# Embeddings may come from a different provider than chat (DeepSeek/MiniMax
+# have no OpenAI-compatible embedding endpoint). Empty values fall back to
+# the chat provider's key/endpoint.
+embedding_api_key = (_cfg("embedding_api_key", "EMBEDDING_API_KEY")
+                     or openai_api_key)
+embedding_base_url = _cfg("embedding_base_url", "EMBEDDING_BASE_URL")
 # Owner name recorded in simulation metadata
 key_owner = os.environ.get("KEY_OWNER", "Anonymous")
 

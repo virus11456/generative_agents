@@ -2,6 +2,62 @@
 {% load static %}
 
 {% block content %}
+
+<!-- ══════════ Town dashboard: watch and control on one page ══════════ -->
+<div id="ville-nav" style="position:fixed; top:0; left:0; right:0; z-index:9998;
+     background:#1f2937; color:#fff; padding:.45em .8em; display:flex;
+     align-items:center; gap:.4em; font-family:sans-serif; font-size:14px;
+     box-shadow:0 2px 8px rgba(0,0,0,.35)">
+  <strong style="margin-right:.5em">🏘️ The Ville</strong>
+  <button onclick="villeOpen('/settings/','⚙️ 設定')" class="ville-btn">⚙️ 設定</button>
+  <button onclick="villeOpen('/events/','🗓️ 事件/選舉')" class="ville-btn">🗓️ 事件/選舉</button>
+  <button onclick="villeOpen('/economy/','💰 經濟/關係')" class="ville-btn">💰 經濟/關係</button>
+  <button onclick="villeOpen('/scenario/','🎭 劇本')" class="ville-btn">🎭 劇本</button>
+  <button onclick="villeOpen('/chronicle/','📰 日報')" class="ville-btn">📰 日報</button>
+  <button onclick="villeOpen('/intervene/','💬 介入')" class="ville-btn">💬 介入</button>
+  <span style="flex:1"></span>
+  <label style="font-size:12px; opacity:.8">token</label>
+  <input id="ville-token" type="password" placeholder="SETTINGS_TOKEN"
+         style="width:9em; padding:.25em .5em; border-radius:6px; border:0">
+</div>
+<style>
+  .ville-btn { background:#374151; color:#fff; border:0; border-radius:6px;
+               padding:.35em .8em; cursor:pointer; font-size:13px }
+  .ville-btn:hover { background:#4b5563 }
+  body { padding-top: 2.6em }
+</style>
+<div id="ville-drawer" style="display:none; position:fixed; top:2.55em; right:0;
+     bottom:0; width:min(560px,95vw); z-index:9999; background:#fff;
+     box-shadow:-4px 0 18px rgba(0,0,0,.3); flex-direction:column">
+  <div style="display:flex; align-items:center; padding:.5em .8em;
+       background:#111827; color:#fff; font-family:sans-serif">
+    <strong id="ville-drawer-title" style="flex:1"></strong>
+    <button onclick="villeRefresh()" class="ville-btn" title="重新整理">⟳</button>
+    <button onclick="document.getElementById('ville-drawer').style.display='none'"
+            class="ville-btn" style="margin-left:.4em">✕ 關閉</button>
+  </div>
+  <iframe id="ville-frame" style="flex:1; border:0; width:100%"></iframe>
+</div>
+<script>
+  (function(){
+    var saved = localStorage.getItem('ville_token') || '';
+    document.getElementById('ville-token').value = saved;
+  })();
+  function villeOpen(path, title){
+    var token = document.getElementById('ville-token').value.trim();
+    localStorage.setItem('ville_token', token);
+    var url = path + (token ? '?token=' + encodeURIComponent(token) : '');
+    document.getElementById('ville-drawer-title').textContent = title;
+    document.getElementById('ville-frame').src = url;
+    document.getElementById('ville-drawer').style.display = 'flex';
+  }
+  function villeRefresh(){
+    var frame = document.getElementById('ville-frame');
+    frame.src = frame.src;
+  }
+</script>
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+
 <br>
 <br>
 <div>

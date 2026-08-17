@@ -107,18 +107,35 @@ def home(request):
   f_curr_sim_code = "temp_storage/curr_sim_code.json"
   f_curr_step = "temp_storage/curr_step.json"
 
-  if not check_if_file_exists(f_curr_step): 
+  if not check_if_file_exists(f_curr_sim_code):
     context = {}
     template = "home/error_start_backend.html"
     return render(request, template, context)
 
-  with open(f_curr_sim_code) as json_file:  
+  with open(f_curr_sim_code) as json_file:
     sim_code = json.load(json_file)["sim_code"]
-  
-  with open(f_curr_step) as json_file:  
-    step = json.load(json_file)["step"]
 
-  os.remove(f_curr_step)
+  # curr_step.json is consumed on read (original design); when it is absent
+  # (e.g. the page was refreshed while the backend computes a step), derive
+  # the current step from the sim's own files instead of erroring out.
+  step = None
+  if check_if_file_exists(f_curr_step):
+    with open(f_curr_step) as json_file:
+      step = json.load(json_file)["step"]
+    os.remove(f_curr_step)
+  else:
+    movement_dir = f"storage/{sim_code}/movement"
+    if os.path.isdir(movement_dir):
+      step_numbers = [int(name.split(".")[0])
+                      for name in os.listdir(movement_dir)
+                      if name.endswith(".json")
+                      and name.split(".")[0].isdigit()]
+      if step_numbers:
+        step = max(step_numbers)
+  if step is None:
+    if not os.path.isdir(f"storage/{sim_code}"):
+      return render(request, "home/error_start_backend.html", {})
+    step = 0
 
   persona_names = []
   persona_names_set = set()

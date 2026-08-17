@@ -69,7 +69,7 @@
     <button type="button" class="preset" onclick="preset('rumor')">🤫 Plant a rumor</button>
   </div>
 
-  <form method="post">
+  <form method="post">{% csrf_token %}
     <input type="hidden" name="token" value="{{ token }}">
     <input type="hidden" name="action" value="add">
 
@@ -128,7 +128,7 @@
   {% for e in events %}
   <div class="event">
     <strong>#{{ e.id }} {{ e.label }}</strong> ({{ e.type }})
-    <form method="post" style="display:inline; float:right">
+    <form method="post" style="display:inline; float:right">{% csrf_token %}
       <input type="hidden" name="token" value="{{ token }}">
       <input type="hidden" name="action" value="remove">
       <input type="hidden" name="id" value="{{ e.id }}">

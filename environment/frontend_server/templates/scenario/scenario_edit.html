@@ -42,7 +42,7 @@
     whispers are saved to <code>{{ csv_name }}</code>.</div>
   {% endif %}
 
-  <form method="post">
+  <form method="post">{% csrf_token %}
     <input type="hidden" name="token" value="{{ token }}">
 
     {% for p in personas %}

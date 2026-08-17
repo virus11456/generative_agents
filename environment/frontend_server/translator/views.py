@@ -12,6 +12,7 @@ import os
 import datetime
 from django.shortcuts import render, redirect, HttpResponseRedirect
 from django.http import HttpResponse, JsonResponse
+from django.views.decorators.csrf import csrf_exempt
 from global_methods import *
 
 from django.templatetags.static import static
@@ -238,6 +239,7 @@ def path_tester(request):
   return render(request, template, context)
 
 
+@csrf_exempt
 def process_environment(request): 
   """
   <FRONTEND to BACKEND> 
@@ -265,6 +267,7 @@ def process_environment(request):
   return HttpResponse("received")
 
 
+@csrf_exempt
 def update_environment(request): 
   """
   <BACKEND to FRONTEND> 
@@ -295,6 +298,7 @@ def update_environment(request):
   return JsonResponse(response_data)
 
 
+@csrf_exempt
 def path_tester_update(request): 
   """
   Processing the path and saving it to path_tester_env.json temp storage for 
@@ -359,12 +363,9 @@ def llm_settings(request):
   llm_config.json shared with the simulation backend; restart reverie.py
   to apply changes. Optionally protected by the SETTINGS_TOKEN env var.
   """
-  required_token = os.environ.get("SETTINGS_TOKEN", "")
-  supplied_token = request.POST.get("token", request.GET.get("token", ""))
-  if required_token and supplied_token != required_token:
-    return HttpResponse(
-      "Forbidden: this page is protected. Append ?token=<SETTINGS_TOKEN> "
-      "to the URL.", status=403)
+  forbidden, supplied_token = _token_forbidden(request)
+  if forbidden:
+    return forbidden
 
   cfg_path = _llm_config_path()
   try:
@@ -421,12 +422,9 @@ def intervene(request):
   temp_storage/interventions.json, which reverie.py polls while running.
   Protected by SETTINGS_TOKEN when set.
   """
-  required_token = os.environ.get("SETTINGS_TOKEN", "")
-  supplied_token = request.POST.get("token", request.GET.get("token", ""))
-  if required_token and supplied_token != required_token:
-    return HttpResponse(
-      "Forbidden: this page is protected. Append ?token=<SETTINGS_TOKEN> "
-      "to the URL.", status=403)
+  forbidden, supplied_token = _token_forbidden(request)
+  if forbidden:
+    return forbidden
 
   sim_code, persona_names = _current_sim_personas()
 
@@ -438,18 +436,15 @@ def intervene(request):
     if not persona_name or not whisper:
       error = "Both a persona and a whisper are required."
     else:
-      interventions_file = "temp_storage/interventions.json"
-      try:
-        with open(interventions_file) as f:
-          items = json.load(f)
-      except (OSError, ValueError):
-        items = []
-      items += [{"persona": persona_name, "whisper": whisper}]
-      # Atomic replace so the backend never reads a half-written file.
-      tmp_file = interventions_file + ".tmp"
-      with open(tmp_file, "w") as f:
-        f.write(json.dumps(items, indent=2))
-      os.replace(tmp_file, interventions_file)
+      # One file per whisper: no read-modify-write, so the backend
+      # (which consumes and deletes files) can never race with us.
+      import uuid
+      os.makedirs("temp_storage/interventions", exist_ok=True)
+      file_stem = f"temp_storage/interventions/{uuid.uuid4().hex}"
+      with open(file_stem + ".tmp", "w") as f:
+        f.write(json.dumps({"persona": persona_name, "whisper": whisper},
+                           indent=2))
+      os.replace(file_stem + ".tmp", file_stem + ".json")
       queued = True
 
   context = {"sim_code": sim_code,
@@ -476,12 +471,26 @@ _BACKEND_DIR = os.path.abspath(os.path.join(
 
 
 def _token_forbidden(request):
+  """
+  Gate for the admin pages (/settings/, /intervene/, /events/, /scenario/,
+  /chronicle/). With SETTINGS_TOKEN set, the matching ?token= is required.
+  Without it, only localhost may use these pages -- so a public deployment
+  that forgot to set a token is closed by default rather than open.
+  """
   required_token = os.environ.get("SETTINGS_TOKEN", "")
   supplied_token = request.POST.get("token", request.GET.get("token", ""))
-  if required_token and supplied_token != required_token:
+  if required_token:
+    if supplied_token != required_token:
+      return HttpResponse(
+        "Forbidden: this page is protected. Append ?token=<SETTINGS_TOKEN> "
+        "to the URL.", status=403), supplied_token
+    return None, supplied_token
+  remote_addr = request.META.get("REMOTE_ADDR", "")
+  if remote_addr not in ("127.0.0.1", "::1"):
     return HttpResponse(
-      "Forbidden: this page is protected. Append ?token=<SETTINGS_TOKEN> "
-      "to the URL.", status=403), supplied_token
+      "Forbidden: admin pages are localhost-only until you set the "
+      "SETTINGS_TOKEN environment variable (then open this page with "
+      "?token=<value>).", status=403), supplied_token
   return None, supplied_token
 
 
@@ -528,18 +537,26 @@ def scenario_home(request):
     else:
       # scenario_generator.py lives in the backend and uses backend-relative
       # paths, so it runs as a subprocess with the backend as cwd. This can
-      # take a minute or more (one LLM call per persona).
-      result = subprocess.run(
-        [_sys.executable, "scenario_generator.py", "--fork", fork,
-         "--name", name, "--story", story],
-        cwd=_BACKEND_DIR, capture_output=True, text=True, timeout=1800)
-      if result.returncode == 0:
-        url = f"/scenario/{name}/"
-        if token:
-          url += f"?token={token}"
-        return HttpResponseRedirect(url)
-      error = "Generation failed."
-      output = (result.stdout or "") + "\n" + (result.stderr or "")
+      # take a minute or more (one LLM call per persona). The timeout stays
+      # under gunicorn's --timeout 600 so the worker is not killed first.
+      try:
+        result = subprocess.run(
+          [_sys.executable, "scenario_generator.py", "--fork", fork,
+           "--name", name, "--story", story],
+          cwd=_BACKEND_DIR, capture_output=True, text=True, timeout=570)
+      except subprocess.TimeoutExpired:
+        result = None
+        error = ("Generation timed out. For large casts (e.g. the "
+                 "25-persona base), run scenario_generator.py from the "
+                 "command line instead.")
+      if result is not None:
+        if result.returncode == 0:
+          url = f"/scenario/{name}/"
+          if token:
+            url += f"?token={token}"
+          return HttpResponseRedirect(url)
+        error = "Generation failed."
+        output = (result.stdout or "") + "\n" + (result.stderr or "")
 
   context = {"sims": _list_sims(),
              "error": error,
@@ -624,17 +641,14 @@ def scenario_edit(request, sim_code):
 # ============================================================================
 
 def _queue_event_command(command):
-  command_file = "temp_storage/event_command.json"
-  try:
-    with open(command_file) as f:
-      commands = json.load(f)
-  except (OSError, ValueError):
-    commands = []
-  commands += [command]
-  tmp_file = command_file + ".tmp"
-  with open(tmp_file, "w") as f:
-    f.write(json.dumps(commands, indent=2))
-  os.replace(tmp_file, command_file)
+  # One file per command: no read-modify-write, so the backend (which
+  # consumes and deletes files) can never race with us.
+  import uuid
+  os.makedirs("temp_storage/event_commands", exist_ok=True)
+  file_stem = f"temp_storage/event_commands/{uuid.uuid4().hex}"
+  with open(file_stem + ".tmp", "w") as f:
+    f.write(json.dumps(command, indent=2))
+  os.replace(file_stem + ".tmp", file_stem + ".json")
 
 
 def events_page(request):
@@ -720,6 +734,9 @@ def chronicle_page(request):
     return forbidden
 
   sim_code = request.GET.get("sim", "").strip()
+  # Reject anything that isn't a plain simulation name (path traversal).
+  if sim_code and not _re.fullmatch(r"[\w-]+", sim_code):
+    sim_code = ""
   if not sim_code:
     sim_code, _ = _current_sim_personas()
 

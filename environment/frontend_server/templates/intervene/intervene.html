@@ -43,7 +43,7 @@
   <div class="err">{{ error }}</div>
   {% endif %}
 
-  <form method="post">
+  <form method="post">{% csrf_token %}
     <input type="hidden" name="token" value="{{ token }}">
 
     <label for="persona">Agent</label>

@@ -262,10 +262,11 @@ python reverie.py
 2. 開 `http://<你的VPS>:8000/simulator_home` 觀看模擬——**跑模擬時要保持這個分頁開啟**（畫面步進由瀏覽器驅動）
 3. 回放：`http://<你的VPS>:8000/replay/<模擬名稱>/<起始步數>/`
 
-**安全提醒（重要）**：本系統沒有登入驗證，放上公網請務必——
+**安全設計與提醒**：
 
-* 用防火牆把 8000 埠限制在你自己的 IP，或在前面架 nginx + basic auth
-* 一定要設 `SETTINGS_TOKEN`（保護 API key 設定頁）和真實的 `ALLOWED_HOSTS`
+* 管理頁（`/settings/`、`/intervene/`、`/events/`、`/scenario/`、`/chronicle/`）**預設只允許本機存取**——公網部署想遠端使用，必須設 `SETTINGS_TOKEN` 並在網址加 `?token=<值>`（忘記設 token 的公開部署是「預設關閉」而不是預設敞開）
+* 所有管理頁表單都有 CSRF 防護
+* 仍建議：防火牆把 8000 埠限制在你自己的 IP，或在前面架 nginx + basic auth（注意：經反向代理後來源 IP 可能變成本機，此時務必依靠 `SETTINGS_TOKEN`）；設定真實的 `ALLOWED_HOSTS`
 * `llm_config.json` 內含你的 API key，注意檔案權限（系統會自動設為 600）
 
 ## 執行測試（不需要 API key）

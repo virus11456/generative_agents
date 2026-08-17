@@ -43,7 +43,7 @@
   {% endif %}
 
   <h2>Generate a new scenario</h2>
-  <form method="post" onsubmit="document.getElementById('spinner').style.display='block'">
+  <form method="post" onsubmit="document.getElementById('spinner').style.display='block'">{% csrf_token %}
     <input type="hidden" name="token" value="{{ token }}">
 
     <label for="fork">Base simulation</label>

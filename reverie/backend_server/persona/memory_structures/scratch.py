@@ -205,12 +205,12 @@ class Scratch:
       self.f_daily_schedule_hourly_org = scratch_load["f_daily_schedule_hourly_org"]
 
       self.act_address = scratch_load["act_address"]
-      if scratch_load["act_start_time"]: 
+      if scratch_load["act_start_time"]:
         self.act_start_time = datetime.datetime.strptime(
                                               scratch_load["act_start_time"],
                                               "%B %d, %Y, %H:%M:%S")
-      else: 
-        self.curr_time = None
+      else:
+        self.act_start_time = None
       self.act_duration = scratch_load["act_duration"]
       self.act_description = scratch_load["act_description"]
       self.act_pronunciatio = scratch_load["act_pronunciatio"]

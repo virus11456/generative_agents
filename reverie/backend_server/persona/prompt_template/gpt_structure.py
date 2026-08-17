@@ -55,10 +55,20 @@ _PRICE_TABLE = {
   "gpt-4o": (2.50, 10.00),
   "gpt-4.1-mini": (0.40, 1.60),
   "gpt-4.1": (2.00, 8.00),
+  "deepseek-chat": (0.27, 1.10),
+  "MiniMax-Text-01": (0.20, 1.10),
+  "gemini-2.0-flash": (0.10, 0.40),
   "text-embedding-3-small": (0.02, 0.0),
   "text-embedding-3-large": (0.13, 0.0),
+  "text-embedding-004": (0.0, 0.0),
 }
 _PRICE_TABLE.update(globals().get("llm_price_table", {}))
+
+# Models not in the table are priced at this conservative fallback so the
+# COST_LIMIT_USD safety fuse still trips for unlisted providers. (For free
+# local models, e.g. Ollama, set COST_LIMIT_USD=0 to disable the fuse, or
+# add exact prices via llm_price_table in utils.py.)
+_DEFAULT_PRICE = (0.50, 1.50)
 
 _client = None
 _emb_client = None
@@ -171,7 +181,7 @@ def get_llm_stats():
     out = {m: dict(v) for m, v in _stats.items()}
   total_cost = 0.0
   for model, s in out.items():
-    inp, outp = _PRICE_TABLE.get(model, (0.0, 0.0))
+    inp, outp = _PRICE_TABLE.get(model, _DEFAULT_PRICE)
     s["est_cost_usd"] = round(s["prompt_tokens"] / 1e6 * inp
                               + s["completion_tokens"] / 1e6 * outp, 6)
     total_cost += s["est_cost_usd"]
@@ -213,21 +223,27 @@ _SYSTEM_MSG = ("Follow the given instructions or continue the given text "
 
 
 def _chat_request(prompt, model=None, temperature=None, max_tokens=None,
-                  top_p=None, stop=None, json_mode=False):
+                  top_p=None, stop=None, json_mode=False, cache_read=True):
   """
   Single entry point for every chat-model call. Handles caching, retry with
   exponential backoff, JSON mode fallback, and usage accounting. Raises the
   last API error if all retries fail.
+
+  cache_read=False skips the cache LOOKUP (a fresh sample is drawn and
+  overwrites the cached entry): validate/retry loops must pass this on
+  their 2nd+ attempts, or an invalid cached response would be returned
+  verbatim on every retry and the loop could never succeed.
   """
   model = _resolve_model(model)
   payload = {"model": model, "prompt": prompt, "temperature": temperature,
              "max_tokens": max_tokens, "top_p": top_p, "stop": stop,
              "json_mode": json_mode}
 
-  cached = cache_get("chat", payload)
-  if cached is not None:
-    _record_usage(model, 0, 0, cached=True)
-    return cached
+  if cache_read:
+    cached = cache_get("chat", payload)
+    if cached is not None:
+      _record_usage(model, 0, 0, cached=True)
+      return cached
 
   kwargs = {"model": model,
             "messages": [{"role": "system", "content": _SYSTEM_MSG},
@@ -302,7 +318,7 @@ def GPT4_request(prompt):
     return "ChatGPT ERROR"
 
 
-def ChatGPT_request(prompt):
+def ChatGPT_request(prompt, cache_read=True):
   """
   Make a request to the configured default chat model.
   ARGS:
@@ -311,7 +327,7 @@ def ChatGPT_request(prompt):
     a str of the model's response.
   """
   try:
-    return _chat_request(prompt)
+    return _chat_request(prompt, cache_read=cache_read)
   except Exception:
     print("ChatGPT ERROR")
     return "ChatGPT ERROR"
@@ -339,7 +355,8 @@ def _json_safe_generate_response(request_model,
   for i in range(repeat):
     try:
       curr_gpt_response = _chat_request(prompt, model=request_model,
-                                        json_mode=True).strip()
+                                        json_mode=True,
+                                        cache_read=(i == 0)).strip()
       end_index = curr_gpt_response.rfind('}') + 1
       curr_gpt_response = curr_gpt_response[:end_index]
       curr_gpt_response = json.loads(curr_gpt_response)["output"]
@@ -398,7 +415,8 @@ def ChatGPT_safe_generate_response_OLD(prompt,
 
   for i in range(repeat):
     try:
-      curr_gpt_response = ChatGPT_request(prompt).strip()
+      curr_gpt_response = ChatGPT_request(prompt,
+                                          cache_read=(i == 0)).strip()
       if func_validate(curr_gpt_response, prompt=prompt):
         return func_clean_up(curr_gpt_response, prompt=prompt)
       if verbose:
@@ -416,7 +434,7 @@ def ChatGPT_safe_generate_response_OLD(prompt,
 # ###################[SECTION 2: ORIGINAL GPT-3 STRUCTURE] ###################
 # ============================================================================
 
-def GPT_request(prompt, gpt_parameter):
+def GPT_request(prompt, gpt_parameter, cache_read=True):
   """
   Legacy entry point used by run_gpt_prompt.py. The retired Completions
   engines named in gpt_parameter["engine"] are transparently served by the
@@ -436,7 +454,8 @@ def GPT_request(prompt, gpt_parameter):
       temperature=gpt_parameter.get("temperature"),
       max_tokens=gpt_parameter.get("max_tokens"),
       top_p=gpt_parameter.get("top_p"),
-      stop=gpt_parameter.get("stop"))
+      stop=gpt_parameter.get("stop"),
+      cache_read=cache_read)
   except Exception:
     print("TOKEN LIMIT EXCEEDED")
     return "TOKEN LIMIT EXCEEDED"
@@ -481,7 +500,8 @@ def safe_generate_response(prompt,
     print(prompt)
 
   for i in range(repeat):
-    curr_gpt_response = GPT_request(prompt, gpt_parameter)
+    curr_gpt_response = GPT_request(prompt, gpt_parameter,
+                                    cache_read=(i == 0))
     if func_validate(curr_gpt_response, prompt=prompt):
       return func_clean_up(curr_gpt_response, prompt=prompt)
     if verbose:

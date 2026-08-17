@@ -38,7 +38,13 @@ DT_FORMAT = "%B %d, %Y, %H:%M:%S"
 
 
 def _dt(s):
-  return datetime.datetime.strptime(s, DT_FORMAT)
+  try:
+    return datetime.datetime.strptime(s, DT_FORMAT)
+  except (ValueError, TypeError):
+    # An unparseable fire_at counts as overdue: the event fires on the next
+    # check and (if one-shot) removes itself, self-healing registries
+    # written with bad timestamps instead of crash-looping the server.
+    return datetime.datetime.min
 
 
 def _dts(dt):

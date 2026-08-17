@@ -364,6 +364,42 @@ class TestEventManager(unittest.TestCase):
     self.assertEqual(len(event["history"]), 1)
     self.assertEqual(event["history"][0]["winners"], ["Ana"])
 
+  def test_unparseable_fire_at_self_heals(self):
+    # Registries written with bad timestamps (e.g. year-1 dates from the
+    # original trait seeding) must fire and clear, not crash the server.
+    import events
+    self.manager.add_event({"type": "broadcast", "text": "seed"}, self.now)
+    self.manager.events[0]["fire_at"] = "January 01, 1, 00:00:00"
+    self.manager.save()
+    self.manager.check(self.now, self.personas)   # must not raise
+    self.assertEqual(len(self.whispers), 4)
+    self.assertEqual(self.manager.events, [])
+
+  def test_trait_seed_events_have_parseable_fire_at(self):
+    import events as events_module
+    import traits
+    import random as random_module
+    sim_folder = tempfile.mkdtemp(prefix="seedchk_")
+    os.makedirs(f"{sim_folder}/reverie", exist_ok=True)
+    d = f"{sim_folder}/personas/Ana Kim/bootstrap_memory"
+    os.makedirs(d, exist_ok=True)
+    with open(f"{d}/scratch.json", "w") as f:
+      json.dump({"name": "Ana Kim", "innate": "kind"}, f)
+    with open(f"{sim_folder}/reverie/meta.json", "w") as f:
+      json.dump({"persona_names": ["Ana Kim"]}, f)
+    manager = events_module.EventManager(sim_folder,
+                                         whisper_fn=lambda *a: None)
+    traits.assign_to_sim(sim_folder, manager,
+                         rng=random_module.Random(1),
+                         with_relationships=False)
+    import datetime
+    for event in manager.events:
+      parsed = datetime.datetime.strptime(event["fire_at"],
+                                          events_module.DT_FORMAT)
+      self.assertLess(parsed, self.now)  # due immediately
+    import shutil
+    shutil.rmtree(sim_folder, ignore_errors=True)
+
   def test_web_command_legacy_file_processed(self):
     with open(f"{self.temp_storage}/event_command.json", "w") as f:
       json.dump([{"action": "add",

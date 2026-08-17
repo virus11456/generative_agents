@@ -329,7 +329,9 @@ def path_tester_update(request):
 
 _LLM_CONFIG_FIELDS = ["provider", "base_url", "chat_model",
                       "smart_chat_model", "embedding_base_url",
-                      "embedding_model"]
+                      "embedding_model",
+                      "cost_limit_usd", "llm_cache", "parallel_personas",
+                      "checkpoint_freq"]
 _LLM_SECRET_FIELDS = ["api_key", "embedding_api_key"]
 
 
@@ -455,3 +457,162 @@ def intervene(request):
              "error": error,
              "token": supplied_token}
   return render(request, "intervene/intervene.html", context)
+
+
+# ============================================================================
+# Scenario editor (generate / preview / edit scenarios in the browser)
+# ============================================================================
+
+import re as _re
+import subprocess
+import sys as _sys
+
+_IDENTITY_FIELDS = ["innate", "learned", "currently", "lifestyle",
+                    "daily_plan_req"]
+_BACKEND_DIR = os.path.abspath(os.path.join(
+  os.path.dirname(os.path.abspath(__file__)), "..", "..", "..",
+  "reverie", "backend_server"))
+
+
+def _token_forbidden(request):
+  required_token = os.environ.get("SETTINGS_TOKEN", "")
+  supplied_token = request.POST.get("token", request.GET.get("token", ""))
+  if required_token and supplied_token != required_token:
+    return HttpResponse(
+      "Forbidden: this page is protected. Append ?token=<SETTINGS_TOKEN> "
+      "to the URL.", status=403), supplied_token
+  return None, supplied_token
+
+
+def _list_sims():
+  sims = []
+  try:
+    for name in sorted(os.listdir("storage")):
+      if os.path.isfile(f"storage/{name}/reverie/meta.json"):
+        sims += [name]
+  except OSError:
+    pass
+  return sims
+
+
+def _scenario_csv_path(sim_code):
+  return f"static_dirs/assets/the_ville/scenario_{sim_code}.csv"
+
+
+def scenario_home(request):
+  """
+  Scenario editor landing page: generate a new scenario from a story
+  premise (runs scenario_generator.py), or pick an existing simulation to
+  edit. Protected by SETTINGS_TOKEN when set.
+  """
+  forbidden, token = _token_forbidden(request)
+  if forbidden:
+    return forbidden
+
+  error = ""
+  output = ""
+  if request.method == "POST":
+    fork = request.POST.get("fork", "").strip()
+    name = request.POST.get("name", "").strip()
+    story = request.POST.get("story", "").strip()
+    if not _re.fullmatch(r"[A-Za-z0-9_-]+", name or ""):
+      error = ("Scenario name must contain only letters, digits, '-' "
+               "and '_'.")
+    elif fork not in _list_sims():
+      error = "Unknown base simulation."
+    elif name in _list_sims():
+      error = f"A simulation named '{name}' already exists."
+    elif not story:
+      error = "A story premise is required."
+    else:
+      # scenario_generator.py lives in the backend and uses backend-relative
+      # paths, so it runs as a subprocess with the backend as cwd. This can
+      # take a minute or more (one LLM call per persona).
+      result = subprocess.run(
+        [_sys.executable, "scenario_generator.py", "--fork", fork,
+         "--name", name, "--story", story],
+        cwd=_BACKEND_DIR, capture_output=True, text=True, timeout=1800)
+      if result.returncode == 0:
+        url = f"/scenario/{name}/"
+        if token:
+          url += f"?token={token}"
+        return HttpResponseRedirect(url)
+      error = "Generation failed."
+      output = (result.stdout or "") + "\n" + (result.stderr or "")
+
+  context = {"sims": _list_sims(),
+             "error": error,
+             "output": output.strip(),
+             "token": token}
+  return render(request, "scenario/scenario_home.html", context)
+
+
+def scenario_edit(request, sim_code):
+  """
+  Edit every persona's identity fields and relationship whispers of a
+  simulation directly in the browser. Saves back to the personas'
+  scratch.json and the scenario whisper CSV.
+  """
+  forbidden, token = _token_forbidden(request)
+  if forbidden:
+    return forbidden
+
+  meta_file = f"storage/{sim_code}/reverie/meta.json"
+  if not os.path.isfile(meta_file):
+    return HttpResponse(f"Unknown simulation: {sim_code}", status=404)
+  with open(meta_file) as f:
+    persona_names = json.load(f)["persona_names"]
+
+  saved = False
+  if request.method == "POST":
+    csv_rows = [["Name", "Whisper"]]
+    for persona_name in persona_names:
+      scratch_path = (f"storage/{sim_code}/personas/{persona_name}/"
+                      f"bootstrap_memory/scratch.json")
+      with open(scratch_path) as f:
+        scratch = json.load(f)
+      for field in _IDENTITY_FIELDS:
+        posted = request.POST.get(f"{persona_name}__{field}")
+        if posted is not None:
+          scratch[field] = posted.strip()
+      with open(scratch_path, "w") as f:
+        f.write(json.dumps(scratch, indent=2))
+
+      whispers = [w.strip() for w in
+                  request.POST.get(f"{persona_name}__whispers",
+                                   "").splitlines() if w.strip()]
+      if whispers:
+        csv_rows += [[persona_name, "; ".join(whispers)]]
+
+    import csv as _csv
+    with open(_scenario_csv_path(sim_code), "w", newline="") as f:
+      _csv.writer(f).writerows(csv_rows)
+    saved = True
+
+  # Load current state for display.
+  personas = []
+  whisper_map = {}
+  csv_path = _scenario_csv_path(sim_code)
+  if os.path.isfile(csv_path):
+    import csv as _csv
+    with open(csv_path) as f:
+      for row in list(_csv.reader(f))[1:]:
+        if len(row) >= 2:
+          whisper_map[row[0]] = "\n".join(
+            w.strip() for w in row[1].split(";") if w.strip())
+  for persona_name in persona_names:
+    scratch_path = (f"storage/{sim_code}/personas/{persona_name}/"
+                    f"bootstrap_memory/scratch.json")
+    with open(scratch_path) as f:
+      scratch = json.load(f)
+    personas += [{"name": persona_name,
+                  "fields": [(field, scratch.get(field) or "")
+                             for field in _IDENTITY_FIELDS],
+                  "whispers": whisper_map.get(persona_name, "")}]
+
+  context = {"sim_code": sim_code,
+             "personas": personas,
+             "csv_name": f"scenario_{sim_code}.csv",
+             "saved": saved,
+             "token": token}
+  return render(request, "scenario/scenario_edit.html", context)

@@ -156,6 +156,26 @@ class TestConfigFilePriority(unittest.TestCase):
     utils = self._reload_utils()
     self.assertEqual(utils.embedding_api_key, "sk-chat-key")
 
+  def test_performance_knobs_from_file(self):
+    cfg_path = os.path.join(_TMP, "llm_config3.json")
+    with open(cfg_path, "w") as f:
+      f.write('{"cost_limit_usd": "3.5", "llm_cache": "0",'
+              ' "parallel_personas": "0", "checkpoint_freq": "25"}')
+    os.environ["LLM_CONFIG_PATH"] = cfg_path
+    utils = self._reload_utils()
+    self.assertEqual(utils.cost_limit_usd, 3.5)
+    self.assertFalse(utils.llm_cache_enabled)
+    self.assertFalse(utils.parallel_personas)
+    self.assertEqual(utils.checkpoint_freq, 25)
+
+  def test_performance_knobs_defaults(self):
+    os.environ["LLM_CONFIG_PATH"] = os.path.join(_TMP, "missing2.json")
+    utils = self._reload_utils()
+    self.assertEqual(utils.cost_limit_usd, 0.0)
+    self.assertTrue(utils.llm_cache_enabled)
+    self.assertTrue(utils.parallel_personas)
+    self.assertEqual(utils.checkpoint_freq, 50)
+
 
 class TestScenarioGenerator(unittest.TestCase):
   def _identity(self, **overrides):

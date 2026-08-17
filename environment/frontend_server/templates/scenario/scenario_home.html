@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Scenario Editor</title>
+  <style>
+    body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+           background: #f4f4f6; margin: 0; padding: 2rem; color: #222; }
+    .card { max-width: 720px; margin: 0 auto 1.5rem; background: #fff;
+            border-radius: 10px; padding: 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+    h1 { margin-top: 0; font-size: 1.4rem; }
+    h2 { font-size: 1.1rem; margin-top: 0; }
+    label { display: block; margin: 1rem 0 .3rem; font-weight: 600;
+            font-size: .9rem; }
+    input, select, textarea { width: 100%; box-sizing: border-box;
+                    padding: .55rem; border: 1px solid #ccc;
+                    border-radius: 6px; font-size: .95rem; }
+    textarea { min-height: 110px; resize: vertical; }
+    .hint { font-size: .8rem; color: #666; margin-top: .25rem; }
+    button { margin-top: 1.6rem; width: 100%; padding: .7rem;
+             background: #059669; color: #fff; border: 0;
+             border-radius: 6px; font-size: 1rem; cursor: pointer; }
+    button:hover { background: #047857; }
+    .err { background: #fef2f2; border: 1px solid #ef4444; color: #991b1b;
+           padding: .6rem .8rem; border-radius: 6px; margin-bottom: 1rem;
+           white-space: pre-wrap; }
+    ul { padding-left: 1.2rem; }
+    li { margin: .3rem 0; }
+    a { color: #2563eb; }
+    #spinner { display: none; text-align: center; color: #666;
+               margin-top: 1rem; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>Scenario Editor</h1>
+
+  {% if error %}
+  <div class="err">{{ error }}{% if output %}
+
+{{ output }}{% endif %}</div>
+  {% endif %}
+
+  <h2>Generate a new scenario</h2>
+  <form method="post" onsubmit="document.getElementById('spinner').style.display='block'">
+    <input type="hidden" name="token" value="{{ token }}">
+
+    <label for="fork">Base simulation</label>
+    <select id="fork" name="fork">
+      {% for sim in sims %}
+      <option value="{{ sim }}" {% if sim == "base_the_ville_isabella_maria_klaus" %}selected{% endif %}>{{ sim }}</option>
+      {% endfor %}
+    </select>
+    <div class="hint">base_the_ville_isabella_maria_klaus = 3 personas;
+      base_the_ville_n25 = 25 personas.</div>
+
+    <label for="name">New scenario name</label>
+    <input id="name" name="name" placeholder="e.g. startup_drama"
+           pattern="[A-Za-z0-9_-]+">
+    <div class="hint">Letters, digits, '-' and '_' only.</div>
+
+    <label for="story">Story premise (any language)</label>
+    <textarea id="story" name="story"
+      placeholder="e.g. 三個室友：一人偷偷計畫創業想挖另外兩人入夥，一人正準備出國留學，一人剛失業還瞞著大家"></textarea>
+
+    <button type="submit">Generate scenario</button>
+    <div id="spinner">Generating (one LLM call per persona -- this can take
+      a minute or several for 25 personas)... keep this tab open.</div>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Edit an existing simulation</h2>
+  {% if sims %}
+  <ul>
+    {% for sim in sims %}
+    <li><a href="/scenario/{{ sim }}/{% if token %}?token={{ token }}{% endif %}">{{ sim }}</a></li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="hint">No simulations found in storage.</p>
+  {% endif %}
+</div>
+</body>
+</html>

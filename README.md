@@ -29,7 +29,7 @@ This repository accompanies our research paper titled "[Generative Agents: Inter
 | VPS 部署 | 支援公網部署，`ALLOWED_HOSTS`、設定頁 token 保護等都已備妥 |
 | Docker 一鍵部署 | `docker compose up -d` 啟動網頁伺服器、`docker compose run --rm backend` 啟動模擬，免裝 Python 環境 |
 | 成本上限保護 | 設 `COST_LIMIT_USD` 預算上限，花費達 80% 警告、達 100% 自動存檔停止，防止掛機跑出天價帳單 |
-| 劇本產生器 | 一句話的故事設定（中英文皆可）→ 自動生成所有角色的人設、目標、人際關係，開一場全新劇本的模擬 |
+| 劇本產生器 + 網頁編輯器 | 一句話的故事設定（中英文皆可）→ 自動生成所有角色的人設、目標、人際關係；`/scenario/` 頁面可直接在瀏覽器生成與逐欄編輯 |
 
 ## 快速開始
 
@@ -133,6 +133,16 @@ python reverie.py
 
 用 `--fork base_the_ville_n25` 可以生成 25 人的大型劇本。角色名字與地圖不變（沿用原有精靈圖與空間資料），變的是他們的靈魂。
 
+### 網頁版劇本編輯器
+不想下指令的話，瀏覽器開 [http://localhost:8000/scenario/](http://localhost:8000/scenario/)：
+
+* **生成**：選底本（3 人或 25 人）→ 取名 → 輸入故事設定（中英文皆可）→ 按 Generate，完成後自動跳到編輯頁
+* **編輯**：任何一場模擬都能點進去，逐一修改每個角色的個性（innate）、背景（learned）、近況（currently）、作息（lifestyle）、日常安排（daily_plan_req）與人際耳語（whispers），按 Save 直接寫回模擬資料
+* 生成需要等待（每個角色一次 LLM 呼叫，3 人約一分鐘內、25 人可能數分鐘），期間請保持分頁開啟
+* 公網部署時同樣受 `SETTINGS_TOKEN` 保護
+
+另外 `/settings/` 頁面現在也包含「Performance & cost」區塊——**成本上限、快取開關、平行開關、自動存檔頻率**都能在網頁上設定，不必再碰環境變數。
+
 ## 成本上限保護
 
 怕掛機跑出天價帳單？設定預算上限（美元）：
@@ -214,7 +224,7 @@ This fork modernizes the original codebase so it runs today:
 * **Player intervention** — `whisper <persona>: <thought>` injects a thought into an agent's memory stream mid-simulation (the paper's Valentine's-party mechanism), `interview <persona>` opens a live chat with an agent, and `help` lists every command.
 * **Web-based provider settings** — visit `/settings` on the environment server to pick a provider preset (OpenAI, DeepSeek, MiniMax, Gemini, Ollama, or any OpenAI-compatible endpoint) and enter API keys in the browser; saved to a git-ignored `llm_config.json` that overrides environment variables.
 * **Web intervention panel** — `/intervene/` lets you whisper a thought into any agent's mind from the browser while the simulation runs.
-* **Scenario generator** — `python scenario_generator.py --name <sim> --story "<premise in any language>"` rewrites every persona's identity and relationships to fit a story premise and produces a loadable whisper CSV.
+* **Scenario generator + web editor** — `python scenario_generator.py --name <sim> --story "<premise in any language>"` rewrites every persona's identity and relationships to fit a story premise and produces a loadable whisper CSV; the `/scenario/` page does the same from the browser, with per-field editing of every persona. The `/settings` page also exposes the cost limit, cache, parallelism, and checkpoint knobs.
 * **Cost ceiling** — set `COST_LIMIT_USD` to auto-save and halt the simulation when the estimated spend reaches your budget (warning at 80%).
 * **Docker deployment** — `docker compose up -d` for the web server and `docker compose run --rm backend` for the interactive simulation; state persists via bind mounts.
 

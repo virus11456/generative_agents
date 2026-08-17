@@ -24,6 +24,7 @@ same-surname pairs.
 Both registries are stored inside the simulation folder, so they survive
 save/fork like everything else.
 """
+import datetime
 import json
 import os
 import random
@@ -272,13 +273,15 @@ def assign_to_sim(sim_folder, event_manager=None, rng=random,
     by_persona = {}
     for persona_name, text in whispers:
       by_persona.setdefault(persona_name, []).append(text)
+    # A safely-parseable date far in the past makes the event due on the
+    # very first check (game clocks start in 2023).
     for persona_name, texts in by_persona.items():
       event_manager.add_event(
         {"type": "broadcast",
          "label": f"persona seed: {persona_name}",
          "text": "; ".join(texts),
          "target": [persona_name]},
-        curr_time=__import__("datetime").datetime(1, 1, 1))
+        curr_time=datetime.datetime(2000, 1, 1))
 
   return registry, relationships
 

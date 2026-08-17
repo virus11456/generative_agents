@@ -449,6 +449,32 @@ class TestChronicle(unittest.TestCase):
       self.sim_folder, 0, 3, llm_fn=lambda p: "x"))
 
 
+class TestAutorunResume(unittest.TestCase):
+  def test_fresh_target_unchanged(self):
+    import reverie
+    storage = tempfile.mkdtemp(prefix="ar_")
+    self.assertEqual(
+      reverie.resolve_autorun_sims("base", "my_town", storage),
+      ("base", "my_town"))
+
+  def test_existing_target_resumes_as_r2(self):
+    import reverie
+    storage = tempfile.mkdtemp(prefix="ar_")
+    os.makedirs(f"{storage}/my_town")
+    self.assertEqual(
+      reverie.resolve_autorun_sims("base", "my_town", storage),
+      ("my_town", "my_town-r2"))
+
+  def test_lineage_continues_from_latest(self):
+    import reverie
+    storage = tempfile.mkdtemp(prefix="ar_")
+    for name in ["my_town", "my_town-r2", "my_town-r3"]:
+      os.makedirs(f"{storage}/{name}")
+    self.assertEqual(
+      reverie.resolve_autorun_sims("base", "my_town", storage),
+      ("my_town-r3", "my_town-r4"))
+
+
 class TestHeadlessEnvironment(unittest.TestCase):
   def test_write_headless_environment(self):
     import reverie

@@ -135,6 +135,10 @@ headless_mode = _cfg_bool("headless", "HEADLESS", False)
 chronicle_enabled = _cfg_bool("chronicle", "CHRONICLE", True)
 chronicle_lang = _cfg("chronicle_lang", "CHRONICLE_LANG",
                       "Traditional Chinese (繁體中文)")
+# Conversation language: agents SPEAK in this language (their inner
+# cognition stays English). Set to "English" for original behavior.
+convo_lang = _cfg("convo_lang", "CONVO_LANG",
+                  "Traditional Chinese (繁體中文)")
 
 llm_cache_enabled = _cfg_bool("llm_cache", "LLM_CACHE", True)
 llm_cache_path = os.environ.get("LLM_CACHE_PATH", "")

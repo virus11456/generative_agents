@@ -441,7 +441,7 @@ _LLM_CONFIG_FIELDS = ["provider", "base_url", "chat_model",
                       "cost_limit_usd", "llm_cache", "parallel_personas",
                       "checkpoint_freq",
                       "headless", "sec_per_step", "real_minutes_per_day",
-                      "chronicle", "chronicle_lang",
+                      "chronicle", "chronicle_lang", "convo_lang",
                       "traits_auto", "economy", "econ_starting_balance",
                       "econ_daily_wage"]
 _LLM_SECRET_FIELDS = ["api_key", "embedding_api_key"]

@@ -102,6 +102,12 @@
 
 	var personas = {};
 	var pronunciatios = {};
+	// Speech bubbles over chatting personas (ported from rimtown's
+	// addConversationBubble): show the current utterance, refresh while
+	// the conversation continues, linger 8s after the last line.
+	var chat_bubbles = {};
+	var bubble_expiry = {};
+	var bubble_last_utt = {};
 	let anims_direction;
 	let pre_anims_direction;
 	let pre_anims_direction_dict = {};
@@ -438,6 +444,15 @@
 	                                   backgroundColor: "#ffffff",
 	                                   border:"solid",
 	                                   borderRadius:"10px"}).setDepth(3);
+	    chat_bubbles[persona_name] = this.add.text(0, 0, "", {
+	                                   font: "13px 'Noto Sans TC', Arial, sans-serif",
+	                                   fill: "#111827",
+	                                   backgroundColor: "#ffffff",
+	                                   padding: { x: 7, y: 5 },
+	                                   wordWrap: { width: 170,
+	                                               useAdvancedWrap: true }})
+	                                 .setDepth(4).setOrigin(0.5, 1)
+	                                 .setVisible(false);
 	  }
 
 	  // Walking animations: one set per persona, generated from that
@@ -590,13 +605,38 @@
 
 	      // Resident cards.
 	      let description_content = execute_movement["persona"][curr_persona_name]["description"];
+	      let chat_arr = execute_movement["persona"][curr_persona_name]["chat"];
 	      let chat_content = "";
-	      if (execute_movement["persona"][curr_persona_name]["chat"] != null ){
-	        for (let j=0; j<execute_movement["persona"][curr_persona_name]["chat"].length; j++) {
-	          chat_content += execute_movement["persona"][curr_persona_name]["chat"][j][0] + ": " + execute_movement["persona"][curr_persona_name]["chat"][j][1] + "<br>"
+	      if (chat_arr != null){
+	        for (let j=0; j<chat_arr.length; j++) {
+	          chat_content += chat_arr[j][0] + ": " + chat_arr[j][1] + "<br>"
 	        }
 	      } else {
 	        chat_content = "<em>目前沒有對話</em>";
+	      }
+
+	      // Speech bubble: the persona's own latest utterance (fallback:
+	      // the conversation's last line). New line -> new bubble text;
+	      // while the chat lasts, the 8s linger keeps refreshing.
+	      if (chat_arr != null && chat_arr.length > 0) {
+	        let latest = null;
+	        for (let j = chat_arr.length - 1; j >= 0; j--) {
+	          if (chat_arr[j][0] == curr_persona_name) {
+	            latest = chat_arr[j][1];
+	            break;
+	          }
+	        }
+	        if (latest == null) latest = chat_arr[chat_arr.length - 1][1];
+	        if (latest && latest.trim() && latest.trim() != "...") {
+	          if (bubble_last_utt[curr_persona_name] !== latest) {
+	            bubble_last_utt[curr_persona_name] = latest;
+	            let short = latest.length > 42
+	                        ? latest.slice(0, 42) + "…" : latest;
+	            chat_bubbles[curr_persona_name].setText(short);
+	            chat_bubbles[curr_persona_name].setVisible(true);
+	          }
+	          bubble_expiry[curr_persona_name] = Date.now() + 8000;
+	        }
 	      }
 	      document.getElementById("current_action__"+curr_persona_name_os).innerHTML = villeZhAction(description_content.split("@")[0]);
 	      document.getElementById("target_address__"+curr_persona_name_os).innerHTML = villeZhAddress(description_content.split("@")[1]);
@@ -637,6 +677,17 @@
 	    }
 	    pronunciatios[persona_name].x = sprite.body.x - 6;
 	    pronunciatios[persona_name].y = sprite.body.y - 42;
+
+	    // Speech bubble follows its speaker; expire after the linger.
+	    let bubble = chat_bubbles[persona_name];
+	    if (bubble && bubble.visible) {
+	      if (Date.now() > (bubble_expiry[persona_name] || 0)) {
+	        bubble.setVisible(false);
+	      } else {
+	        bubble.x = sprite.body.x + 12;
+	        bubble.y = sprite.body.y - 50;
+	      }
+	    }
 	  }
 	}
 

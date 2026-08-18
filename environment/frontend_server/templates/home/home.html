@@ -5,7 +5,10 @@
 
 <!-- ══════════ 小鎮儀表板：一頁觀察 + 一頁調整 ══════════ -->
 <div id="ville-nav">
-  <strong style="margin-right:.5em; white-space:nowrap">🏘️ The Ville</strong>
+  <strong style="margin-right:.2em; white-space:nowrap">🏘️ The Ville</strong>
+  {% if app_version %}<span style="font-size:10.5px; opacity:.5;
+        white-space:nowrap; margin-right:.4em"
+        title="目前運行的程式版本">{{ app_version }}</span>{% endif %}
   <button onclick="villeOpen('/settings/','⚙️ 設定')" class="ville-btn">⚙️ 設定</button>
   <button onclick="villeOpen('/events/','🗓️ 事件/選舉')" class="ville-btn">🗓️ 事件/選舉</button>
   <button onclick="villeOpen('/economy/','💰 經濟/關係')" class="ville-btn">💰 經濟/關係</button>

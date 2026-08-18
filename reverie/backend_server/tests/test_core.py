@@ -97,6 +97,43 @@ class TestStats(unittest.TestCase):
     self.assertIsInstance(gpt_structure.format_llm_stats(), str)
 
 
+class TestJsonSafeGenerate(unittest.TestCase):
+  """Regression tests for the json-mode wrapper used by every
+  ChatGPT_safe_generate_response call site (e.g. poignancy scores)."""
+
+  def _poig_validate_and_clean(self):
+    # Mirrors run_gpt_prompt_event_poignancy's callbacks: the validator
+    # calls .strip() before int(), so a bare-int json "output" used to
+    # fail validation on every repeat.
+    def clean(r, prompt=""):
+      return int(r.strip())
+    def validate(r, prompt=""):
+      try:
+        clean(r)
+        return True
+      except Exception:
+        return False
+    return validate, clean
+
+  def test_numeric_json_output_coerced_to_str(self):
+    from unittest import mock
+    validate, clean = self._poig_validate_and_clean()
+    with mock.patch.object(gpt_structure, "_chat_request",
+                           return_value='{"output": 6}'):
+      out = gpt_structure.ChatGPT_safe_generate_response(
+        "rate this event", "5", "one integer", 3, 4, validate, clean)
+    self.assertEqual(out, 6)
+
+  def test_exhausted_repeats_return_fail_safe_not_false(self):
+    from unittest import mock
+    validate, clean = self._poig_validate_and_clean()
+    with mock.patch.object(gpt_structure, "_chat_request",
+                           return_value='{"output": "not a number"}'):
+      out = gpt_structure.ChatGPT_safe_generate_response(
+        "rate this event", "5", "one integer", 2, 4, validate, clean)
+    self.assertEqual(out, 4)
+
+
 class TestSafeGenerate(unittest.TestCase):
   def test_fail_safe_on_api_error(self):
     # With no API key configured, GPT_request must fall back gracefully and

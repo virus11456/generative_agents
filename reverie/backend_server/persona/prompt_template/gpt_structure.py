@@ -360,6 +360,11 @@ def _json_safe_generate_response(request_model,
       end_index = curr_gpt_response.rfind('}') + 1
       curr_gpt_response = curr_gpt_response[:end_index]
       curr_gpt_response = json.loads(curr_gpt_response)["output"]
+      # In json mode the model often emits {"output": 6} with a bare
+      # number, but the legacy validate/clean-up callbacks expect the
+      # string form (they call .strip() before int()). Coerce scalars.
+      if isinstance(curr_gpt_response, (int, float, bool)):
+        curr_gpt_response = str(curr_gpt_response)
 
       if func_validate(curr_gpt_response, prompt=prompt):
         return func_clean_up(curr_gpt_response, prompt=prompt)
@@ -372,7 +377,13 @@ def _json_safe_generate_response(request_model,
     except Exception:
       pass
 
-  return False
+  # Never return False here: most run_gpt_prompt callers treat False as
+  # "fall through to a legacy code path" that no longer exists below the
+  # ChatGPT block, so they would return None and crash the caller with
+  # "'NoneType' object is not subscriptable". The fail-safe value is the
+  # designed degraded answer -- use it.
+  print("FAIL SAFE TRIGGERED (json)")
+  return fail_safe_response
 
 
 def GPT4_safe_generate_response(prompt,

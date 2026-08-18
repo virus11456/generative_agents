@@ -370,13 +370,23 @@ def run_gpt_prompt_task_decomp(persona,
         _cr += [" ".join([j.strip () for j in i.split(" ")][3:])]
       else: 
         _cr += [i]
-    for count, i in enumerate(_cr): 
+    for count, i in enumerate(_cr):
       k = [j.strip() for j in i.split("(duration in minutes:")]
+      if len(k) < 2 or not k[0]:
+        # Malformed line -- typically the response hit max_tokens and
+        # was cut mid-line. Skip it; the well-formed tasks above still
+        # cover the block.
+        continue
       task = k[0]
-      if task[-1] == ".": 
+      if task[-1] == ".":
         task = task[:-1]
-      duration = int(k[1].split(",")[0].strip())
+      try:
+        duration = int(k[1].split(",")[0].strip())
+      except ValueError:
+        continue
       cr += [[task, duration]]
+    if not cr:
+      raise ValueError("no parsable decomposition lines")
 
     total_expected_min = int(prompt.split("(total duration in minutes")[-1]
                                    .split("):")[0].strip())
@@ -394,11 +404,18 @@ def run_gpt_prompt_task_decomp(persona,
           curr_min_slot += [(i_task, count)]       
     curr_min_slot = curr_min_slot[1:]   
 
-    if len(curr_min_slot) > total_expected_min: 
-      last_task = curr_min_slot[60]
-      for i in range(1, 6): 
+    if not curr_min_slot:
+      raise ValueError("decomposition produced no minutes")
+    if len(curr_min_slot) > total_expected_min:
+      # Original code hardcoded curr_min_slot[60] (assuming 60-minute
+      # blocks) and wrote the last 5 entries unconditionally -- both
+      # crash on short blocks. Clamp the indices instead.
+      last_task = curr_min_slot[min(60, max(total_expected_min - 1, 0),
+                                    len(curr_min_slot) - 1)]
+      for i in range(1, min(6, len(curr_min_slot) + 1)):
         curr_min_slot[-1 * i] = last_task
-    elif len(curr_min_slot) < total_expected_min: 
+      curr_min_slot = curr_min_slot[:max(total_expected_min, 1)]
+    elif len(curr_min_slot) < total_expected_min:
       last_task = curr_min_slot[-1]
       for i in range(total_expected_min - len(curr_min_slot)):
         curr_min_slot += [last_task]
@@ -413,20 +430,25 @@ def run_gpt_prompt_task_decomp(persona,
 
     return cr
 
-  def __func_validate(gpt_response, prompt=""): 
-    # TODO -- this sometimes generates error 
-    try: 
-      __func_clean_up(gpt_response)
-    except: 
-      pass
-      # return False
-    return gpt_response
+  def __func_validate(gpt_response, prompt=""):
+    # The original version swallowed the exception and returned the raw
+    # response (truthy), so validation NEVER failed and a malformed
+    # response crashed the real clean-up call downstream. Validate for
+    # real, with the actual prompt.
+    try:
+      __func_clean_up(gpt_response, prompt)
+    except Exception:
+      return False
+    return True
 
-  def get_fail_safe(): 
+  def get_fail_safe():
     fs = ["asleep"]
     return fs
 
-  gpt_param = {"engine": "text-davinci-003", "max_tokens": 1000, 
+  # max_tokens was 1000, which truncated long decompositions (e.g. a
+  # 7-hour work block in 5-minute tasks) mid-line and caused the parse
+  # failures above.
+  gpt_param = {"engine": "text-davinci-003", "max_tokens": 2000,
              "temperature": 0, "top_p": 1, "stream": False,
              "frequency_penalty": 0, "presence_penalty": 0, "stop": None}
   prompt_template = "persona/prompt_template/v2/task_decomp_v3.txt"

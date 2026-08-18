@@ -513,8 +513,15 @@ def safe_generate_response(prompt,
   for i in range(repeat):
     curr_gpt_response = GPT_request(prompt, gpt_parameter,
                                     cache_read=(i == 0))
-    if func_validate(curr_gpt_response, prompt=prompt):
-      return func_clean_up(curr_gpt_response, prompt=prompt)
+    try:
+      if func_validate(curr_gpt_response, prompt=prompt):
+        # Guarded: several legacy validators are no-ops that approve
+        # anything, so a malformed response (e.g. truncated at
+        # max_tokens) used to explode HERE and kill the whole
+        # simulation. Treat a clean-up crash as a failed attempt.
+        return func_clean_up(curr_gpt_response, prompt=prompt)
+    except Exception:
+      pass
     if verbose:
       print("---- repeat count: ", i, curr_gpt_response)
       print(curr_gpt_response)

@@ -572,6 +572,37 @@ class TestAutorunResume(unittest.TestCase):
       reverie.resolve_autorun_sims("base", "my_town", storage),
       ("my_town-r3", "my_town-r4"))
 
+  def _make_sim(self, storage, name, step):
+    os.makedirs(f"{storage}/{name}/reverie", exist_ok=True)
+    with open(f"{storage}/{name}/reverie/meta.json", "w") as f:
+      json.dump({"step": step}, f)
+
+  def test_dead_forks_pruned(self):
+    # r2 made progress (step 500 > 100); r3/r4/r5 are crash-loop debris
+    # (no step beyond their parent) and must be deleted.
+    import reverie
+    storage = tempfile.mkdtemp(prefix="ar_")
+    self._make_sim(storage, "my_town", 100)
+    self._make_sim(storage, "my_town-r2", 500)
+    for name in ["my_town-r3", "my_town-r4", "my_town-r5"]:
+      self._make_sim(storage, name, 500)
+    self.assertEqual(
+      reverie.resolve_autorun_sims("base", "my_town", storage),
+      ("my_town-r2", "my_town-r3"))
+    self.assertFalse(os.path.isdir(f"{storage}/my_town-r4"))
+    self.assertFalse(os.path.isdir(f"{storage}/my_town-r5"))
+    self.assertTrue(os.path.isdir(f"{storage}/my_town-r2"))
+
+  def test_unreadable_meta_is_never_deleted(self):
+    import reverie
+    storage = tempfile.mkdtemp(prefix="ar_")
+    self._make_sim(storage, "my_town", 100)
+    os.makedirs(f"{storage}/my_town-r2")  # no meta.json
+    self.assertEqual(
+      reverie.resolve_autorun_sims("base", "my_town", storage),
+      ("my_town-r2", "my_town-r3"))
+    self.assertTrue(os.path.isdir(f"{storage}/my_town-r2"))
+
 
 class TestHeadlessEnvironment(unittest.TestCase):
   def test_write_headless_environment(self):

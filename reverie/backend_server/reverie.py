@@ -196,13 +196,14 @@ class ReverieServer:
     self._cost_warned = False
 
     # Web control panel (/control/): pause/resume commands arrive as files
-    # in <fs_temp_storage>/sim_commands/. A fresh process always starts
-    # un-paused, so clear any stale pause marker from a previous run.
-    self.paused = False
-    try:
-      os.remove(f"{fs_temp_storage}/sim_paused.json")
-    except OSError:
-      pass
+    # in <fs_temp_storage>/sim_commands/. A pause marker left by a
+    # previous run is honored, so a deliberately paused town stays paused
+    # across container restarts and VPS reboots (and cannot silently
+    # resume burning API credit); resume from the /control/ page.
+    self.paused = os.path.isfile(f"{fs_temp_storage}/sim_paused.json")
+    if self.paused:
+      print ("[control] starting PAUSED (sim_paused.json present) -- "
+             "resume from the /control/ page.")
 
     # World-event engine (elections, festivals, rumors, custom broadcasts).
     # Events persist in <sim_folder>/reverie/events.json across save/fork.

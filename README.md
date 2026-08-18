@@ -38,7 +38,7 @@ This repository accompanies our research paper titled "[Generative Agents: Inter
 | 小鎮日報 | 每個遊戲日結束自動把當天所有行動與對話寫成一份**中文報紙**，`/chronicle/` 頁面閱讀——離開幾天回來，從日報補劇情 |
 | 一頁式儀表板 | `simulator_home` 頂部就是控制列：設定、事件/選舉、經濟/關係、劇本、日報、介入六個面板以側欄開啟，邊看地圖邊調整；token 輸入一次自動記住 |
 | 時間流速控制 | 設定頁可調「每步遊戲秒數」與「每遊戲日真實分鐘」——例如 60 秒/步 + 15 分鐘/日，就是每 15 真實分鐘過一個遊戲日，同時大幅減少 LLM 呼叫 |
-| 世界控制面板 | 儀表板「🎛️ 控制/回放」：一鍵暫停世界（自動存檔、暫停期間零 API 費用）、一鍵繼續；歷史每一輪都能免費從頭回放 |
+| 世界控制面板 | 儀表板「🎛️ 控制/回放」：一鍵暫停世界（自動存檔、暫停期間零 API 費用）、一鍵繼續；**暫停狀態跨重啟／重開機保持**，不會偷偷復跑燒錢；歷史每一輪都能免費從頭回放 |
 | 居民說中文 | 居民彼此交談預設直接說**繁體中文**（內在思考維持英文，不影響模擬品質也不增加費用）；設定頁「居民對話語言」可改回 English 或任何語言 |
 | 專屬角色造型 | 地圖上 25 位居民各自使用自己的像素角色圖與走路動畫（原版全部同一隻）；角色素材改用本地檔案，不再依賴外部網站 |
 | 全中文介面 + RWD | 所有管理頁面與主畫面都是繁體中文；主頁重新排版——地圖滿版縮放、居民卡片網格，手機、iPad、桌機都能看 |
@@ -349,7 +349,7 @@ This fork modernizes the original codebase so it runs today:
 * **Docker deployment** — `docker compose up -d` for the web server and `docker compose run --rm backend` for the interactive simulation; state persists via bind mounts.
 * **Time-flow control** — `sec_per_step` overrides how many game-seconds each step advances (fewer steps per day = fewer LLM calls), and `real_minutes_per_day` paces stepping so one game day takes at least that many real minutes (e.g. 60 + 15 ≈ a 15-minute game day); both on the `/settings` page.
 * **Conversation language** — agents speak to each other in `CONVO_LANG` (default Traditional Chinese; set "English" for the original behavior) while their inner cognition stays English, so simulation quality and cost are unchanged.
-* **World control panel** — the dashboard's `/control/` drawer pauses the world with one click (finishes the current step, saves, then idles with zero API cost), resumes it, and lists every saved run with a free full replay link.
+* **World control panel** — the dashboard's `/control/` drawer pauses the world with one click (finishes the current step, saves, then idles with zero API cost), resumes it, and lists every saved run with a free full replay link. A paused town stays paused across container restarts and reboots — it never silently resumes spending.
 * **Per-persona sprites** — the live map now renders each of the 25 residents with their own local spritesheet and walk animations (previously one shared placeholder character loaded from an external site).
 * **One-page dashboard** — `simulator_home` now carries a fixed control bar: Settings, Events/Elections, Economy/Relationships, Scenario, Chronicle, and Intervene all open in a side drawer over the live map, with the admin token remembered in the browser.
 * **Traditional Chinese UI + responsive layout** — every admin page and the main map page are localized to Traditional Chinese; the home page is redesigned with a full-width scaling map and a resident card grid that works on phones, tablets, and desktops.

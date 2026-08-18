@@ -256,10 +256,22 @@ def replay_persona_state(request, sim_code, step, persona_name):
   to_translate += schedule_tasks
   zh_map = zh_translate.translate_map(to_translate)
 
+  def _zh_datetime(value):
+    # "February 13, 2023, 08:19:50" -> "2023 年 2 月 13 日 08:19"
+    try:
+      dt = datetime.datetime.strptime(str(value), "%B %d, %Y, %H:%M:%S")
+    except (TypeError, ValueError):
+      return value
+    weekday = "一二三四五六日"[dt.weekday()]
+    return (f"{dt.year} 年 {dt.month} 月 {dt.day} 日"
+            f"（週{weekday}）{dt.strftime('%H:%M')}")
+
   scratch = dict(scratch)
   for field in ident_fields:
     original = str(scratch.get(field) or "")
     scratch[field] = zh_map.get(original.strip(), original)
+  for field in ("curr_time", "act_start_time"):
+    scratch[field] = _zh_datetime(scratch.get(field))
   daily_req_zh = [zh_map.get(str(x).strip(), str(x)) for x in daily_req]
   schedule_zh = []
   for item, task in zip(schedule, schedule_tasks):

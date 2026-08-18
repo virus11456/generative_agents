@@ -455,23 +455,43 @@ def run_gpt_prompt_task_decomp(persona,
   # print (prompt)
   print (output)
 
+  # Defensive normalization: keep only valid [task, minutes] pairs. The
+  # fail-safe (["asleep"]) or a malformed response would otherwise crash
+  # the unpacking below.
+  normalized = []
+  for item in output:
+    if isinstance(item, (list, tuple)) and len(item) == 2:
+      try:
+        normalized += [[str(item[0]), int(item[1])]]
+      except (TypeError, ValueError):
+        pass
+  if not normalized:
+    normalized = [[str(task), max(int(duration), 0)]]
+  output = normalized
+
   fin_output = []
   time_sum = 0
-  for i_task, i_duration in output: 
+  for i_task, i_duration in output:
     time_sum += i_duration
     # HM?????????
-    # if time_sum < duration: 
-    if time_sum <= duration: 
+    # if time_sum < duration:
+    if time_sum <= duration:
       fin_output += [[i_task, i_duration]]
-    else: 
+    else:
       break
+  if not fin_output:
+    # The model's first sub-task is already longer than the block being
+    # decomposed (tiny blocks happen when resuming mid-hour). The original
+    # code crashed here on fin_output[-1] -- the author left the exact
+    # IndexError in the comment above. Collapse to one block-filling task.
+    fin_output = [[output[0][0], max(int(duration), 0)]]
   ftime_sum = 0
-  for fi_task, fi_duration in fin_output: 
+  for fi_task, fi_duration in fin_output:
     ftime_sum += fi_duration
-  
+
   # print ("for debugging... line 365", fin_output)
   fin_output[-1][1] += (duration - ftime_sum)
-  output = fin_output 
+  output = fin_output
 
 
 

@@ -1093,21 +1093,48 @@ class ReverieServer:
         pass
 
 
+def _sim_step(storage_dir, sim):
+  try:
+    with open(f"{storage_dir}/{sim}/reverie/meta.json") as f:
+      return json.load(f).get("step")
+  except (OSError, ValueError):
+    return None
+
+
 def resolve_autorun_sims(origin, target, storage_dir):
   """
   Restart-safe sim naming for autorun: if <target> already exists (the
   container restarted or was updated), resume from the newest run in the
   lineage (<target>, <target>-r2, <target>-r3, ...) by forking it into the
   next free -rN name, instead of crashing on the existing folder.
+
+  Crash-loop protection: a lineage member that made ZERO progress beyond
+  its parent (its meta step is not larger) is a dead fork left by a
+  crash-restart loop -- it is deleted so the disk does not fill up with
+  junk copies, and the resume point stays at the last real progress.
+  Members whose progress cannot be read are kept (never delete data we
+  cannot assess).
   """
   if not os.path.isdir(f"{storage_dir}/{target}"):
     return origin, target
+  lineage = [target]
   n = 2
-  latest = target
   while os.path.isdir(f"{storage_dir}/{target}-r{n}"):
-    latest = f"{target}-r{n}"
+    lineage.append(f"{target}-r{n}")
     n += 1
-  return latest, f"{target}-r{n}"
+  while len(lineage) > 1:
+    child_step = _sim_step(storage_dir, lineage[-1])
+    parent_step = _sim_step(storage_dir, lineage[-2])
+    if (child_step is None or parent_step is None
+        or child_step > parent_step):
+      break
+    dead = lineage.pop()
+    shutil.rmtree(f"{storage_dir}/{dead}", ignore_errors=True)
+    print (f"Autorun: removed dead fork '{dead}' (no progress).")
+  n = 2
+  while os.path.isdir(f"{storage_dir}/{target}-r{n}"):
+    n += 1
+  return lineage[-1], f"{target}-r{n}"
 
 
 if __name__ == '__main__':

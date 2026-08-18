@@ -204,10 +204,11 @@
 	let tile_width = 32;
 	// Important: tile_width % movement_speed has to be 0.
 	// <movement_speed> determines how fast we move at each update cycle.
-	// 2 px per frame = 16 animation frames per tile (~0.3s at 60fps), so
-	// a walking persona strides continuously with the leg animation
-	// playing, instead of dashing a whole tile in a blink and freezing.
-	let movement_speed = 2;
+	// 1 px per frame = 32 animation frames per tile (~0.53s at 60fps).
+	// This matches the backend's pacing floor (~0.6s per step), so a
+	// walking persona strides near-continuously from tile to tile
+	// instead of dashing and freezing ("floating").
+	let movement_speed = 1;
 
 	// <timer_max> determines how frequently our update function will query the 
 	// frontend server. If it's higher, we wait longer cycles. 
@@ -445,22 +446,22 @@
 	    anims.create({
 	      key: texture_key + "-left-walk",
 	      frames: anims.generateFrameNames(texture_key, { prefix: "left-walk.", start: 0, end: 3, zeroPad: 3 }),
-	      frameRate: 4,
+	      frameRate: 8,
 	      repeat: -1 });
 	    anims.create({
 	      key: texture_key + "-right-walk",
 	      frames: anims.generateFrameNames(texture_key, { prefix: "right-walk.", start: 0, end: 3, zeroPad: 3 }),
-	      frameRate: 4,
+	      frameRate: 8,
 	      repeat: -1 });
 	    anims.create({
 	      key: texture_key + "-down-walk",
 	      frames: anims.generateFrameNames(texture_key, { prefix: "down-walk.", start: 0, end: 3, zeroPad: 3 }),
-	      frameRate: 4,
+	      frameRate: 8,
 	      repeat: -1 });
 	    anims.create({
 	      key: texture_key + "-up-walk",
 	      frames: anims.generateFrameNames(texture_key, { prefix: "up-walk.", start: 0, end: 3, zeroPad: 3 }),
-	      frameRate: 4,
+	      frameRate: 8,
 	      repeat: -1 });
 	  }
 	}

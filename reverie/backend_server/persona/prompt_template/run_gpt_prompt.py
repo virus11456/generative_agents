@@ -2895,10 +2895,20 @@ def run_gpt_generate_iterative_chat_utt(maze, init_persona, target_persona, retr
     return cleaned_dict
 
   print ("11")
-  prompt_template = "persona/prompt_template/v3_ChatGPT/iterative_convo_v1.txt" 
-  prompt_input = create_prompt_input(maze, init_persona, target_persona, retrieved, curr_context, curr_chat) 
+  prompt_template = "persona/prompt_template/v3_ChatGPT/iterative_convo_v1.txt"
+  prompt_input = create_prompt_input(maze, init_persona, target_persona, retrieved, curr_context, curr_chat)
   print ("22")
   prompt = generate_prompt(prompt_input, prompt_template)
+  # Spoken-language override (CONVO_LANG / settings page): the agents'
+  # inner cognition stays English, but their utterances -- what is shown
+  # on screen and stored as conversation transcripts -- switch language.
+  import utils as _utils
+  _convo_lang = getattr(_utils, "convo_lang", "")
+  if _convo_lang and _convo_lang.strip().lower() != "english":
+    prompt += (f"\nImportant: {init_persona.scratch.name} speaks in "
+               f"{_convo_lang}. The utterance value in the json must be "
+               f"written in {_convo_lang} (people's names may stay in "
+               f"their original form).")
   print (prompt)
   fail_safe = get_fail_safe() 
   output = ChatGPT_safe_generate_response_OLD(prompt, 3, fail_safe,

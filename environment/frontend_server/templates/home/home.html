@@ -93,8 +93,26 @@
                          font-size: .92em; }
   .ville-card span:empty::before { content: "（目前沒有）"; color: #bbb; }
 
+  /* 行動描述最多 3 行；對話變成可捲動小視窗，不再撐爆卡片 */
+  .ville-card span[id^="current_action__"] {
+    display: -webkit-box; -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical; overflow: hidden; }
+  .ville-card span[id^="chat__"] {
+    display: block; max-height: 9.5em; overflow-y: auto;
+    background: #f9fafb; border: 1px solid #eef0f3; border-radius: 8px;
+    padding: .5em .7em; font-size: .95em; line-height: 1.55; }
+  .ville-card span[id^="chat__"]:empty {
+    background: none; border: 0; padding: 0; }
+
   @media (max-width: 640px) {
-    body { padding-top: 5.2em; }
+    /* 手機：控制列不固定（往下捲就讓位給地圖），按鈕縮小、
+       token 欄位吃滿一行 */
+    body { padding-top: 0; }
+    #ville-nav { position: static; padding: .45em .5em; gap: .3em; }
+    #ville-nav label { display: none; }
+    .ville-btn { font-size: 12px; padding: .32em .6em; }
+    #ville-token { flex: 1 1 8em; }
+    #ville-drawer { top: 0; width: 100vw; }
     .ville-residents { grid-template-columns: 1fr; }
     #game-time-content { font-size: 1.05em; }
     .ville-time-bar { flex-wrap: wrap; gap: .4em; }

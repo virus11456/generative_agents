@@ -108,3 +108,6 @@ environment/frontend_server/temp_storage/event_commands/
 environment/frontend_server/temp_storage/zh_cache.sqlite
 environment/frontend_server/temp_storage/sim_commands/
 environment/frontend_server/temp_storage/sim_paused.json
+environment/frontend_server/temp_storage/curr_sim_code.json
+environment/frontend_server/temp_storage/path_tester_env.json
+environment/frontend_server/temp_storage/path_tester_out.json

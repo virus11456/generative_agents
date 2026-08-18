@@ -20,13 +20,19 @@ if [ "$LOCAL" = "$REMOTE" ]; then
 fi
 
 echo "$(date '+%F %T') updating ${LOCAL:0:8} -> ${REMOTE:0:8}"
+CHANGED=$(git diff --name-only "$LOCAL" "$REMOTE")
 git pull -q origin main
 
-# Restart with the autorun profile only if the autorun town is running.
-PROFILE=""
-if docker ps --format '{{.Names}}' | grep -q "autorun"; then
-  PROFILE="--profile autorun"
+# Restart the town only when backend-side files changed; frontend-only
+# updates (templates, static, views) leave the simulation untouched, so
+# routine UI updates never interrupt the world or fork a new -rN run.
+if echo "$CHANGED" | grep -qE '^(reverie/|compose\.yaml|Dockerfile|requirements\.txt|\.env)'; then
+  PROFILE=""
+  if docker ps --format '{{.Names}}' | grep -q "autorun"; then
+    PROFILE="--profile autorun"
+  fi
+  docker compose $PROFILE up -d --build --force-recreate
+else
+  docker compose up -d --build --force-recreate frontend
 fi
-
-docker compose $PROFILE up -d --build --force-recreate
 echo "$(date '+%F %T') update complete"

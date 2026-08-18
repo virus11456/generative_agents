@@ -667,6 +667,14 @@ class ReverieServer:
             write_headless_environment(sim_folder, self.step, movements)
             with open(f"{fs_temp_storage}/curr_step.json", "w") as outfile:
               outfile.write(json.dumps({"step": self.step}, indent=2))
+            # Self-heal the sim-code pointer every step too: it is
+            # otherwise written only once at init, so a git operation or
+            # manual edit clobbering it left browsers watching a stale
+            # (or nonexistent) sim while the world ran on invisibly.
+            with open(f"{fs_temp_storage}/curr_sim_code.json",
+                      "w") as outfile:
+              outfile.write(json.dumps({"sim_code": self.sim_code},
+                                       indent=2))
 
           # A game day just started: pay everyone's daily wage.
           if self.economy and self.curr_time.date() != prev_date:

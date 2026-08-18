@@ -268,17 +268,18 @@
 	  // Joon: This is the export json file you get from Tiled. 
 	  this.load.tilemapTiledJSON("map", "{% static 'assets/the_ville/visuals/the_ville_jan7.json' %}");
 
-	  // An atlas is a way to pack multiple images together into one texture. I'm 
-	  // using it to load all the player animations (walking left, walking right, 
-	  // etc.) in one image. For more info see:
-	  // https://labs.phaser.io/view.html?src=src/animation/texture%20atlas%20animation.js
-	  // If you don't use an atlas, you can do the same thing with a spritesheet, 
-	  // see: https://labs.phaser.io/view.html?src=src/animation/single%20sprite%20sheet.js
-	  // Joon: Technically, I think this guy had the best tutorial for atlas: 
-	  //       https://www.youtube.com/watch?v=fdXcD9X4NrQ&ab_channel=MorganPage
-	  this.load.atlas("atlas", 
-	                  "https://mikewesthad.github.io/phaser-3-tilemap-blog-posts/post-1/assets/atlas/atlas.png", 
-	                  "https://mikewesthad.github.io/phaser-3-tilemap-blog-posts/post-1/assets/atlas/atlas.json");
+	  // Each persona has its own spritesheet in assets/characters/<Name>.png;
+	  // they all share one atlas.json (frames: "down", "left-walk.000", ...).
+	  // "atlas" is only used by the invisible camera anchor sprite.
+	  this.load.atlas("atlas",
+	                  "{% static 'assets/characters/Yuriko_Yamamoto.png' %}",
+	                  "{% static 'assets/characters/atlas.json' %}");
+	  {% for p_name, p_name_os in persona_names %}
+	  {% with 'assets/characters/'|add:p_name_os|add:'.png' as character_img %}
+	  this.load.atlas("{{ p_name_os }}", "{% static character_img %}",
+	                  "{% static 'assets/characters/atlas.json' %}");
+	  {% endwith %}
+	  {% endfor %}
 	}
 
 	function create() {  
@@ -365,10 +366,11 @@
 	  // The image  used for the sprite has a bit of whitespace, so I'm using 
 	  // setSize & setOffset to control the size of the player's body.
 	  player = this.physics.add.
-	                sprite(800, 288, "atlas", "misa-front").
+	                sprite(800, 288, "atlas", "down").
 	                setSize(30, 40).
 	                setOffset(0, 0);
 	  player.setDepth(-1);
+	  player.setVisible(false);
 	  // Setting up the camera: no follow target -- we drive scrollX/scrollY
 	  // directly (arrow keys, drag) so the whole town can stay in view.
 	  const camera = this.cameras.main;
@@ -407,54 +409,57 @@
 
 	  // *** SET UP PERSONAS *** 
 	  // We start by creating the game sprite objects. 
-	  for (let i=0; i<Object.keys(spawn_tile_loc).length; i++) { 
+	  for (let i=0; i<Object.keys(spawn_tile_loc).length; i++) {
 	    let persona_name = Object.keys(spawn_tile_loc)[i];
-	    let start_pos = [spawn_tile_loc[persona_name][0] * tile_width + tile_width / 2, 
+	    let texture_key = persona_name.replace(/ /g, "_");
+	    let start_pos = [spawn_tile_loc[persona_name][0] * tile_width + tile_width / 2,
 	                     spawn_tile_loc[persona_name][1] * tile_width + tile_width];
 	    let new_sprite = this.physics.add
-	                         .sprite(start_pos[0], start_pos[1], "atlas", "misa-front")
+	                         .sprite(start_pos[0], start_pos[1], texture_key, "down")
 	                         .setSize(30, 40)
-	                         .setOffset(0, 32); // DEBUG 1 --- I added 32 offset on Dec 29. 
+	                         .setOffset(0, 0);
+	    new_sprite.displayWidth = 40;
+	    new_sprite.scaleY = new_sprite.scaleX;
 	    // Here, we are creating the persona and its pronunciatio sprites.
 	    personas[persona_name] = new_sprite;
 	    pronunciatios[persona_name] = this.add.text(
-	                                   new_sprite.body.x - 6, 
-	                                   new_sprite.body.y - 42 - 32, // DEBUG 1 --- I added 32 offset on Dec 29. 
+	                                   new_sprite.body.x - 6,
+	                                   new_sprite.body.y - 42,
 	                                   "🦁", {
-	                                   font: "28px monospace", 
-	                                   fill: "#000000", 
-	                                   padding: { x: 8, y: 8}, 
+	                                   font: "28px monospace",
+	                                   fill: "#000000",
+	                                   padding: { x: 8, y: 8},
 	                                   backgroundColor: "#ffffff",
 	                                   border:"solid",
 	                                   borderRadius:"10px"}).setDepth(3);
 	  }
 
-	  // Create the player's walking animations from the texture atlas. These are
-	  // stored in the global animation manager so any sprite can access them.
+	  // Walking animations: one set per persona, generated from that
+	  // persona's own spritesheet (shared frame names via atlas.json).
 	  const anims = this.anims;
-	  anims.create({
-	    key: "misa-left-walk",
-	    frames: anims.generateFrameNames("atlas", { prefix: "misa-left-walk.", start: 0, end: 3, zeroPad: 3 }),
-	    frameRate: 4,
-	    repeat: -1 });
-
-	  anims.create({
-	    key: "misa-right-walk",
-	    frames: anims.generateFrameNames("atlas", { prefix: "misa-right-walk.", start: 0, end: 3, zeroPad: 3 }),
-	    frameRate: 4,
-	    repeat: -1 });
-
-	  anims.create({
-	    key: "misa-front-walk",
-	    frames: anims.generateFrameNames("atlas", { prefix: "misa-front-walk.", start: 0, end: 3, zeroPad: 3 }),
-	    frameRate: 4,
-	    repeat: -1 });
-
-	  anims.create({
-	    key: "misa-back-walk",
-	    frames: anims.generateFrameNames("atlas", { prefix: "misa-back-walk.", start: 0, end: 3, zeroPad: 3 }),
-	    frameRate: 4,
-	    repeat: -1 });
+	  for (let i=0; i<Object.keys(spawn_tile_loc).length; i++) {
+	    let texture_key = Object.keys(spawn_tile_loc)[i].replace(/ /g, "_");
+	    anims.create({
+	      key: texture_key + "-left-walk",
+	      frames: anims.generateFrameNames(texture_key, { prefix: "left-walk.", start: 0, end: 3, zeroPad: 3 }),
+	      frameRate: 4,
+	      repeat: -1 });
+	    anims.create({
+	      key: texture_key + "-right-walk",
+	      frames: anims.generateFrameNames(texture_key, { prefix: "right-walk.", start: 0, end: 3, zeroPad: 3 }),
+	      frameRate: 4,
+	      repeat: -1 });
+	    anims.create({
+	      key: texture_key + "-down-walk",
+	      frames: anims.generateFrameNames(texture_key, { prefix: "down-walk.", start: 0, end: 3, zeroPad: 3 }),
+	      frameRate: 4,
+	      repeat: -1 });
+	    anims.create({
+	      key: texture_key + "-up-walk",
+	      frames: anims.generateFrameNames(texture_key, { prefix: "up-walk.", start: 0, end: 3, zeroPad: 3 }),
+	      frameRate: 4,
+	      repeat: -1 });
+	  }
 	}
 
 
@@ -607,25 +612,26 @@
 	        	anims_direction = "";
 	        }
 
-	        curr_pronunciatio.x = curr_persona.body.x - 6; 
-          curr_pronunciatio.y = curr_persona.body.y - 42 - 32; // DEBUG 1 --- I added 32 offset on Dec 29. 
+	        curr_pronunciatio.x = curr_persona.body.x - 6;
+          curr_pronunciatio.y = curr_persona.body.y - 42;
 
+          let texture_key = curr_persona_name.replace(/ /g, "_");
           if (anims_direction == "l") {
-			      curr_persona.anims.play("misa-left-walk", true);
+			      curr_persona.anims.play(texture_key + "-left-walk", true);
 			    } else if (anims_direction == "r") {
-			      curr_persona.anims.play("misa-right-walk", true);
+			      curr_persona.anims.play(texture_key + "-right-walk", true);
 			    } else if (anims_direction == "u") {
-			      curr_persona.anims.play("misa-back-walk", true);
+			      curr_persona.anims.play(texture_key + "-up-walk", true);
 			    } else if (anims_direction == "d") {
-			      curr_persona.anims.play("misa-front-walk", true);
+			      curr_persona.anims.play(texture_key + "-down-walk", true);
 			    } else {
 			      curr_persona.anims.stop();
 
 			      // If we were moving, pick an idle frame to use
-			      if (pre_anims_direction_dict[curr_persona_name] == "l") curr_persona.setTexture("atlas", "misa-left");else
-			      if (pre_anims_direction_dict[curr_persona_name] == "r") curr_persona.setTexture("atlas", "misa-right");else
-			      if (pre_anims_direction_dict[curr_persona_name] == "u") curr_persona.setTexture("atlas", "misa-back");else
-			      if (pre_anims_direction_dict[curr_persona_name] == "d") curr_persona.setTexture("atlas", "misa-front");
+			      if (pre_anims_direction_dict[curr_persona_name] == "l") curr_persona.setTexture(texture_key, "left");else
+			      if (pre_anims_direction_dict[curr_persona_name] == "r") curr_persona.setTexture(texture_key, "right");else
+			      if (pre_anims_direction_dict[curr_persona_name] == "u") curr_persona.setTexture(texture_key, "up");else
+			      if (pre_anims_direction_dict[curr_persona_name] == "d") curr_persona.setTexture(texture_key, "down");
 			    };
 
 	      } 

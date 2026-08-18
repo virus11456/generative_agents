@@ -316,6 +316,60 @@ class EconomyPageTests(SimpleTestCase):
       self.client.get("/economy/?token=s3cret").status_code, 200)
 
 
+class ControlPageTests(SimpleTestCase):
+  COMMANDS_DIR = "temp_storage/sim_commands"
+
+  def _queued(self):
+    if not os.path.isdir(self.COMMANDS_DIR):
+      return []
+    return [json.load(open(f"{self.COMMANDS_DIR}/{name}"))
+            for name in sorted(os.listdir(self.COMMANDS_DIR))
+            if name.endswith(".json")]
+
+  def _clean(self):
+    import shutil
+    shutil.rmtree(self.COMMANDS_DIR, ignore_errors=True)
+    if os.path.exists("temp_storage/sim_paused.json"):
+      os.remove("temp_storage/sim_paused.json")
+
+  def setUp(self):
+    os.environ.pop("SETTINGS_TOKEN", None)
+    self._clean()
+
+  def tearDown(self):
+    self._clean()
+    os.environ.pop("SETTINGS_TOKEN", None)
+
+  def test_get_renders(self):
+    response = self.client.get("/control/")
+    self.assertEqual(response.status_code, 200)
+    self.assertContains(response, "世界控制")
+
+  def test_token_protection(self):
+    os.environ["SETTINGS_TOKEN"] = "s3cret"
+    self.assertEqual(self.client.get("/control/").status_code, 403)
+    self.assertEqual(
+      self.client.get("/control/?token=s3cret").status_code, 200)
+
+  def test_pause_queues_command(self):
+    self.client.post("/control/", {"action": "pause"})
+    self.assertEqual(self._queued(), [{"action": "pause"}])
+
+  def test_resume_queues_command(self):
+    self.client.post("/control/", {"action": "resume"})
+    self.assertEqual(self._queued(), [{"action": "resume"}])
+
+  def test_unknown_action_ignored(self):
+    self.client.post("/control/", {"action": "explode"})
+    self.assertEqual(self._queued(), [])
+
+  def test_paused_state_shown(self):
+    with open("temp_storage/sim_paused.json", "w") as f:
+      json.dump({"paused": True, "at": "February 13, 2023, 04:00:00"}, f)
+    response = self.client.get("/control/")
+    self.assertContains(response, "世界已暫停")
+
+
 class ZhTranslateTests(SimpleTestCase):
   def setUp(self):
     import tempfile as _tf

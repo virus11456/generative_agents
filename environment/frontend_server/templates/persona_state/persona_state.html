@@ -9,10 +9,11 @@
 	                    sans-serif; }
 	.scratch_table { font-size: 1.15em; }
 	.scratch_table td { padding: .3em .4em; vertical-align: top; }
-	/* 標籤欄不換行：避免小螢幕上中文被擠成一字一行 */
-	.scratch_table td:first-child { width: auto !important;
+	/* 標籤欄縮到內容寬（width:1% + nowrap 技巧）：標籤不會被擠成
+	   一字一行，數值欄也永遠緊貼在標籤右側，不會漂到卡片最右邊 */
+	.scratch_table td:first-child { width: 1% !important;
 	                                white-space: nowrap;
-	                                padding-right: 1.2em; }
+	                                padding-right: 1.4em; }
 	.ps-card { max-width: 980px; margin: 1.5em auto; background: #fff;
 	           padding: 2em 2.5em; border-radius: 12px;
 	           box-shadow: 0 2px 10px rgba(0,0,0,.08); }

@@ -106,3 +106,5 @@ environment/frontend_server/temp_storage/curr_step.json
 environment/frontend_server/temp_storage/interventions/
 environment/frontend_server/temp_storage/event_commands/
 environment/frontend_server/temp_storage/zh_cache.sqlite
+environment/frontend_server/temp_storage/sim_commands/
+environment/frontend_server/temp_storage/sim_paused.json

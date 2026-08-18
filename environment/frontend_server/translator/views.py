@@ -284,6 +284,59 @@ def replay_persona_state(request, sim_code, step, persona_name):
   return render(request, template, context)
 
 
+def control_page(request):
+  """
+  World control panel: pause/resume the running simulation (queued as
+  one-file-per-command under temp_storage/sim_commands/, consumed by
+  reverie.py between steps) and browse saved runs for replay.
+  Protected by SETTINGS_TOKEN when set.
+  """
+  forbidden, token = _token_forbidden(request)
+  if forbidden:
+    return forbidden
+
+  queued = ""
+  if request.method == "POST":
+    action = request.POST.get("action", "")
+    if action in ("pause", "resume"):
+      import uuid
+      os.makedirs("temp_storage/sim_commands", exist_ok=True)
+      file_stem = f"temp_storage/sim_commands/{uuid.uuid4().hex}"
+      with open(file_stem + ".tmp", "w") as f:
+        f.write(json.dumps({"action": action}, indent=2))
+      os.replace(file_stem + ".tmp", file_stem + ".json")
+      queued = action
+
+  paused_info = None
+  if os.path.isfile("temp_storage/sim_paused.json"):
+    try:
+      with open("temp_storage/sim_paused.json") as f:
+        paused_info = json.load(f)
+    except (OSError, ValueError):
+      paused_info = {}
+
+  curr_sim, _ = _current_sim_personas()
+
+  runs = []
+  for sim in _list_sims():
+    chronicle_dir = f"storage/{sim}/chronicle"
+    issues = 0
+    if os.path.isdir(chronicle_dir):
+      issues = len([n for n in os.listdir(chronicle_dir)
+                    if n.endswith(".md")])
+    runs.append({"sim": sim,
+                 "is_live": sim == curr_sim,
+                 "issues": issues})
+  runs.reverse()
+
+  context = {"queued": queued,
+             "paused_info": paused_info,
+             "curr_sim": curr_sim,
+             "runs": runs,
+             "token": token}
+  return render(request, "control/control.html", context)
+
+
 def path_tester(request):
   context = {}
   template = "path_tester/path_tester.html"

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>世界控制</title>
+  <style>
+    body { font-family: -apple-system, "Segoe UI", "Noto Sans TC", Roboto,
+           sans-serif;
+           background: #f4f4f6; margin: 0; padding: 2rem; color: #222; }
+    .card { max-width: 640px; margin: 0 auto 1.5rem; background: #fff;
+            border-radius: 10px; padding: 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+    h1 { margin-top: 0; font-size: 1.4rem; }
+    h2 { font-size: 1.05rem; margin-top: 0; }
+    .hint { font-size: .8rem; color: #666; margin-top: .3rem; }
+    .row { display: flex; gap: .8rem; margin-top: 1rem; }
+    button { flex: 1; padding: .8rem; border: 0; border-radius: 8px;
+             font-size: 1rem; cursor: pointer; color: #fff; }
+    button.pause { background: #b45309; }
+    button.pause:hover { background: #92400e; }
+    button.resume { background: #059669; }
+    button.resume:hover { background: #047857; }
+    .state { padding: .8rem 1rem; border-radius: 8px; margin-top: .5rem;
+             font-size: .95rem; }
+    .state.running { background: #ecfdf5; border: 1px solid #10b981;
+                     color: #065f46; }
+    .state.paused { background: #fffbeb; border: 1px solid #f59e0b;
+                    color: #92400e; }
+    .ok { background: #eff6ff; border: 1px solid #3b82f6; color: #1e3a8a;
+          padding: .6rem .8rem; border-radius: 6px; margin-bottom: 1rem;
+          font-size: .9rem; }
+    table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    th, td { text-align: left; border-bottom: 1px solid #eee;
+             padding: .5rem .4rem; }
+    a { color: #2563eb; }
+    .live { display: inline-block; background: #fee2e2; color: #b91c1c;
+            border-radius: 999px; padding: .1rem .6rem; font-size: .78rem;
+            font-weight: 700; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>🎛️ 世界控制</h1>
+
+  {% if queued == "pause" %}
+  <div class="ok">暫停指令已送出。後端會先跑完當前步驟並<strong>自動存檔</strong>，
+    然後停下（暫停期間不花任何 API 費用）。幾秒後重新整理本頁可看到狀態。</div>
+  {% elif queued == "resume" %}
+  <div class="ok">繼續指令已送出。世界會在幾秒內恢復運轉。</div>
+  {% endif %}
+
+  {% if paused_info %}
+  <div class="state paused">⏸ 世界已暫停{% if paused_info.at %}
+    （暫停於遊戲時間 {{ paused_info.at }}）{% endif %}——進度已存檔，
+    不會產生 API 費用。</div>
+  {% else %}
+  <div class="state running">▶ 世界運轉中{% if curr_sim %}：{{ curr_sim }}{% endif %}</div>
+  {% endif %}
+
+  <div class="row">
+    <form method="post" style="flex:1">{% csrf_token %}
+      <input type="hidden" name="token" value="{{ token }}">
+      <input type="hidden" name="action" value="pause">
+      <button type="submit" class="pause" style="width:100%">⏸ 暫停世界（自動存檔）</button>
+    </form>
+    <form method="post" style="flex:1">{% csrf_token %}
+      <input type="hidden" name="token" value="{{ token }}">
+      <input type="hidden" name="action" value="resume">
+      <button type="submit" class="resume" style="width:100%">▶ 繼續</button>
+    </form>
+  </div>
+  <div class="hint">暫停＝小鎮時間凍結、隨時可續，適合長時間不看的時候省錢。
+    想「終止這一輪」就一直放著暫停即可——每一輪本來就會完整存檔。
+    地圖上的 ⏸ 按鈕只暫停你眼前的畫面，這裡的按鈕才是暫停整個世界。</div>
+</div>
+
+<div class="card">
+  <h2>🎞️ 歷史存檔與回放</h2>
+  {% if not runs %}
+  <p class="hint">storage 目錄裡還沒有任何模擬。</p>
+  {% else %}
+  <table>
+    <tr><th>模擬</th><th>日報數</th><th></th></tr>
+    {% for r in runs %}
+    <tr>
+      <td>{{ r.sim }} {% if r.is_live %}<span class="live">● 直播中</span>{% endif %}</td>
+      <td>{{ r.issues }}</td>
+      <td>
+        {% if r.is_live %}
+        <a href="/simulator_home" target="_blank">觀看直播</a>
+        {% else %}
+        <a href="/replay/{{ r.sim }}/1/" target="_blank">▶ 從頭回放</a>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  <div class="hint">回放讀的是硬碟裡錄好的軌跡，完全不花 API 費用。
+    正在直播的那一輪請不要回放（會互相干擾），其他輪都可以隨意看。</div>
+  {% endif %}
+</div>
+</body>
+</html>

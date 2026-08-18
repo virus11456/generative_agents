@@ -195,6 +195,15 @@ class ReverieServer:
     # Whether the 80%-of-cost-limit warning has been printed yet.
     self._cost_warned = False
 
+    # Web control panel (/control/): pause/resume commands arrive as files
+    # in <fs_temp_storage>/sim_commands/. A fresh process always starts
+    # un-paused, so clear any stale pause marker from a previous run.
+    self.paused = False
+    try:
+      os.remove(f"{fs_temp_storage}/sim_paused.json")
+    except OSError:
+      pass
+
     # World-event engine (elections, festivals, rumors, custom broadcasts).
     # Events persist in <sim_folder>/reverie/events.json across save/fork.
     self.events = EventManager(sim_folder, fs_temp_storage)
@@ -278,6 +287,52 @@ class ReverieServer:
     except Exception:
       pass
 
+
+  def _apply_pending_sim_commands(self):
+    """
+    The frontend's /control/ page queues world-control commands as one
+    file per command under <fs_temp_storage>/sim_commands/. Supported:
+    {"action": "pause"} -- finish the current step, save, then idle;
+    {"action": "resume"} -- continue stepping.
+    While paused the loop only polls this directory (no LLM calls), and
+    sim_paused.json tells the frontend the current state.
+    """
+    commands_dir = f"{fs_temp_storage}/sim_commands"
+    if not os.path.isdir(commands_dir):
+      return
+    for file_name in sorted(os.listdir(commands_dir)):
+      if file_name.startswith(".") or not file_name.endswith(".json"):
+        continue
+      file_path = f"{commands_dir}/{file_name}"
+      try:
+        with open(file_path) as f:
+          command = json.load(f)
+      except (OSError, ValueError):
+        command = {}
+      try:
+        os.remove(file_path)
+      except OSError:
+        pass
+      action = command.get("action")
+      if action == "pause" and not self.paused:
+        self.paused = True
+        try:
+          self.save()
+        except Exception:
+          traceback.print_exc()
+        with open(f"{fs_temp_storage}/sim_paused.json", "w") as f:
+          f.write(json.dumps(
+            {"paused": True, "sim_code": self.sim_code,
+             "at": self.curr_time.strftime("%B %d, %Y, %H:%M:%S")},
+            indent=2))
+        print ("[control] simulation paused and saved.")
+      elif action == "resume" and self.paused:
+        self.paused = False
+        try:
+          os.remove(f"{fs_temp_storage}/sim_paused.json")
+        except OSError:
+          pass
+        print ("[control] simulation resumed.")
 
   def _apply_pending_interventions(self):
     """
@@ -453,11 +508,18 @@ class ReverieServer:
     # <game_obj_cleanup> is used for that. 
     game_obj_cleanup = dict()
 
-    # The main while loop of Reverie. 
-    while (True): 
-      # Done with this iteration if <int_counter> reaches 0. 
-      if int_counter == 0: 
+    # The main while loop of Reverie.
+    while (True):
+      # Done with this iteration if <int_counter> reaches 0.
+      if int_counter == 0:
         break
+
+      # Web control panel: pick up pause/resume commands; while paused,
+      # keep polling without stepping (and without any LLM cost).
+      self._apply_pending_sim_commands()
+      if self.paused:
+        time.sleep(1)
+        continue
 
       # <curr_env_file> file is the file that our frontend outputs. When the
       # frontend has done its job and moved the personas, then it will put a 

@@ -38,9 +38,11 @@
                font-size: 14px; flex-wrap: wrap;
                box-shadow: 0 2px 8px rgba(0,0,0,.35); }
   .ville-btn { background: #374151; color: #fff; border: 0;
-               border-radius: 6px; padding: .35em .8em; cursor: pointer;
-               font-size: 13px; }
+               border-radius: 8px; padding: .38em .85em; cursor: pointer;
+               font-size: 13px; white-space: nowrap;
+               transition: background .12s, transform .08s; }
   .ville-btn:hover { background: #4b5563; }
+  .ville-btn:active { transform: scale(.95); }
   #ville-token { width: 9em; padding: .3em .6em; border-radius: 6px;
                  border: 1px solid #4b5563; background: #111827;
                  color: #fff; font-size: 13px; }
@@ -48,7 +50,11 @@
   #ville-drawer { display: none; position: fixed; top: 2.9em; right: 0;
                   bottom: 0; width: min(560px, 96vw); z-index: 9999;
                   background: #fff; flex-direction: column;
-                  box-shadow: -4px 0 18px rgba(0,0,0,.3); }
+                  box-shadow: -4px 0 18px rgba(0,0,0,.3);
+                  animation: ville-slide-in .22s ease; }
+  @keyframes ville-slide-in {
+    from { transform: translateX(40px); opacity: .4; }
+    to { transform: none; opacity: 1; } }
   .ville-drawer-head { display: flex; align-items: center;
                        padding: .5em .8em; background: #111827;
                        color: #fff; }
@@ -78,12 +84,18 @@
                      display: grid; gap: 12px;
                      grid-template-columns: repeat(auto-fill,
                                                    minmax(310px, 1fr)); }
-  .ville-card { background: #fff; border-radius: 12px; padding: 1em 1.2em;
-                box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+  .ville-card { background: #fff; border-radius: 14px; padding: 1em 1.2em;
+                box-shadow: 0 2px 8px rgba(0,0,0,.07);
+                transition: box-shadow .15s, transform .15s; }
+  @media (hover: hover) {
+    .ville-card:hover { box-shadow: 0 6px 18px rgba(0,0,0,.13);
+                        transform: translateY(-2px); } }
   .ville-card-head { display: flex; align-items: center; gap: .7em;
                      margin-bottom: .5em; }
-  .ville-card-head img { width: 2.6em; height: 2.6em;
-                         image-rendering: pixelated; }
+  .ville-card-head img { width: 2.8em; height: 2.8em;
+                         image-rendering: pixelated;
+                         background: #eef1f5; border-radius: 10px;
+                         padding: 2px; }
   .ville-card-head h2 { font-size: 1.15em; margin: 0; font-weight: 700; }
   .ville-card-head a { font-size: .78em; color: #2563eb;
                        white-space: nowrap; }
@@ -106,16 +118,21 @@
 
   @media (max-width: 640px) {
     /* 手機：控制列不固定（往下捲就讓位給地圖），按鈕縮小、
-       token 欄位吃滿一行 */
+       token 欄位獨佔一行 */
     body { padding-top: 0; }
-    #ville-nav { position: static; padding: .45em .5em; gap: .3em; }
+    #ville-nav { position: static; padding: .5em .55em; gap: .3em; }
     #ville-nav label { display: none; }
-    .ville-btn { font-size: 12px; padding: .32em .6em; }
-    #ville-token { flex: 1 1 8em; }
+    .ville-btn { font-size: 12.5px; padding: .38em .62em; }
+    #ville-token { flex: 1 1 100%; font-size: 16px; padding: .45em .7em; }
     #ville-drawer { top: 0; width: 100vw; }
-    .ville-residents { grid-template-columns: 1fr; }
-    #game-time-content { font-size: 1.05em; }
-    .ville-time-bar { flex-wrap: wrap; gap: .4em; }
+    .ville-map-card { padding: 0 .5em; margin-top: .6em; }
+    #game-container { border-radius: 10px; }
+    .ville-residents { grid-template-columns: 1fr; padding: 0 .6em;
+                       gap: 10px; }
+    .ville-card { border-radius: 12px; }
+    #game-time-content { font-size: 1.02em; }
+    .ville-time-bar { flex-wrap: wrap; gap: .4em; padding: .6em .8em;
+                      width: calc(100% - 1.2em); }
     .ville-zoom-hint { display: none; }
   }
 </style>
@@ -187,6 +204,6 @@
 </script>
 
 <!-- partial -->
-<script src='https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.js'></script>
+<script src='https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js'></script>
 {% include 'home/main_script.html' %}
 {% endblock content %}

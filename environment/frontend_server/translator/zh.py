@@ -38,8 +38,8 @@ def _llm_config():
     pass
   api_key = cfg.get("api_key") or os.environ.get("OPENAI_API_KEY", "")
   base_url = cfg.get("base_url") or os.environ.get("OPENAI_BASE_URL", "")
-  model = cfg.get("chat_model") or os.environ.get("CHAT_MODEL",
-                                                  "gpt-4o-mini")
+  model = (cfg.get("chat_model") or os.environ.get("OPENAI_CHAT_MODEL")
+           or os.environ.get("CHAT_MODEL") or "gpt-4o-mini")
   return api_key, (base_url or None), model
 
 

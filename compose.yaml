@@ -17,6 +17,11 @@ services:
     environment:
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
       - SETTINGS_TOKEN=${SETTINGS_TOKEN:-}
+      # The persona-page Chinese translation (translator/zh.py) runs in
+      # the frontend process and needs LLM credentials too.
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-}
+      - OPENAI_CHAT_MODEL=${OPENAI_CHAT_MODEL:-gpt-4o-mini}
     restart: unless-stopped
 
   backend:

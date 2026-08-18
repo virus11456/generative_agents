@@ -103,6 +103,36 @@ def UIST_Demo(request):
   return demo(request, "March20_the_ville_n25_UIST_RUN-step-1-141", 2160, play_speed="3")
 
 
+def _read_app_version():
+  """
+  Short git hash of the running code, read straight from .git files (no
+  git binary in the container). Evaluated once per process start, so it
+  updates on every deploy and lets the UI show which version is live.
+  """
+  root = os.path.abspath(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))
+  try:
+    with open(os.path.join(root, ".git", "HEAD")) as f:
+      head = f.read().strip()
+    if head.startswith("ref: "):
+      ref = head[5:]
+      ref_path = os.path.join(root, ".git", *ref.split("/"))
+      if os.path.exists(ref_path):
+        with open(ref_path) as f:
+          return f.read().strip()[:8]
+      with open(os.path.join(root, ".git", "packed-refs")) as f:
+        for line in f:
+          if line.strip().endswith(ref):
+            return line.split()[0][:8]
+      return ""
+    return head[:8]
+  except OSError:
+    return ""
+
+
+APP_VERSION = _read_app_version()
+
+
 def home(request):
   f_curr_sim_code = "temp_storage/curr_sim_code.json"
   f_curr_step = "temp_storage/curr_step.json"
@@ -159,9 +189,10 @@ def home(request):
         persona_init_pos += [[key, val["x"], val["y"]]]
 
   context = {"sim_code": sim_code,
-             "step": step, 
+             "step": step,
              "persona_names": persona_names,
              "persona_init_pos": persona_init_pos,
+             "app_version": APP_VERSION,
              "mode": "simulate"}
   template = "home/home.html"
   return render(request, template, context)
